@@ -4,6 +4,21 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import ForceGraph2D from 'react-force-graph-2d';
 import { GraphNode, GraphLink } from '@/lib/lastfm';
 
+// Extended interfaces for force-graph library objects
+interface ForceGraphNode extends GraphNode {
+  x?: number;
+  y?: number;
+  vx?: number;
+  vy?: number;
+  fx?: number | null;
+  fy?: number | null;
+}
+
+interface ForceGraphLink extends Omit<GraphLink, 'source' | 'target'> {
+  source: ForceGraphNode | string;
+  target: ForceGraphNode | string;
+}
+
 interface MusicGraphProps {
   data: {
     nodes: GraphNode[];
@@ -27,19 +42,26 @@ const genreColors: Record<string, string> = {
   blues: '#5DADE2',
   country: '#F1948A',
   alternative: '#58D68D',
-  unknown: '#95A5A6'
+  unknown: '#95A5A6',
 };
 
-export default function MusicGraph({ data, onNodeClick, onNodeHover, selectedNode }: MusicGraphProps) {
+export default function MusicGraph({
+  data,
+  onNodeClick,
+  onNodeHover,
+  selectedNode,
+}: MusicGraphProps) {
   const graphRef = useRef<any>(null); // eslint-disable-line @typescript-eslint/no-explicit-any
   const [dimensions, setDimensions] = useState({ width: 800, height: 600 });
   const [hoveredNode, setHoveredNode] = useState<string | null>(null);
+  const imageCache = useRef<Map<string, HTMLImageElement>>(new Map()).current;
+  const [, forceUpdate] = useState({});
 
   useEffect(() => {
     const handleResize = () => {
       setDimensions({
         width: window.innerWidth,
-        height: window.innerHeight - 120
+        height: window.innerHeight - 120,
       });
     };
 
@@ -51,9 +73,11 @@ export default function MusicGraph({ data, onNodeClick, onNodeHover, selectedNod
   useEffect(() => {
     if (graphRef.current && data.nodes.length > 0) {
       graphRef.current.d3Force('charge').strength(-300);
-      graphRef.current.d3Force('link').distance((link: any) => 50 / (link.value || 1)); // eslint-disable-line @typescript-eslint/no-explicit-any
+      graphRef.current
+        .d3Force('link')
+        .distance((link: any) => 50 / (link.value || 1)); // eslint-disable-line @typescript-eslint/no-explicit-any
       graphRef.current.d3Force('center').strength(0.05);
-      
+
       setTimeout(() => {
         graphRef.current?.zoomToFit(400, 50);
       }, 500);
@@ -62,113 +86,193 @@ export default function MusicGraph({ data, onNodeClick, onNodeHover, selectedNod
 
   const getNodeColor = useCallback((node: GraphNode) => {
     const genre = node.group?.toLowerCase() || 'unknown';
-    
+
     for (const [key, color] of Object.entries(genreColors)) {
       if (genre.includes(key)) return color;
     }
-    
+
     return genreColors.unknown;
   }, []);
 
-  const nodeCanvasObject = useCallback((node: any, ctx: CanvasRenderingContext2D, globalScale: number) => { // eslint-disable-line @typescript-eslint/no-explicit-any
-    const label = node.name;
-    const nodeSize = node.size || 10;
-    const fontSize = Math.max(12 / globalScale, nodeSize / 3);
-    const nodeColor = getNodeColor(node);
-    const isHovered = hoveredNode === node.id;
-    const isSelected = selectedNode === node.id;
-    
-    // Draw glow effect
-    if (isHovered || isSelected || node.depth === 0) {
-      ctx.shadowColor = nodeColor;
-      ctx.shadowBlur = isSelected ? 30 : isHovered ? 20 : 15;
-      ctx.fillStyle = nodeColor + '44';
+  const nodeCanvasObject = useCallback(
+    (
+      node: ForceGraphNode,
+      ctx: CanvasRenderingContext2D,
+      globalScale: number
+    ) => {
+      // Force-graph ensures x, y are available during rendering
+      const x = node.x ?? 0;
+      const y = node.y ?? 0;
+      const label = node.name;
+      const nodeSize = node.size || 10;
+      const fontSize = Math.max(12 / globalScale, nodeSize / 3);
+      const nodeColor = getNodeColor(node);
+      const isHovered = hoveredNode === node.id;
+      const isSelected = selectedNode === node.id;
+
+      // Draw glow effect
+      if (isHovered || isSelected || node.depth === 0) {
+        ctx.shadowColor = nodeColor;
+        ctx.shadowBlur = isSelected ? 30 : isHovered ? 20 : 15;
+        ctx.fillStyle = nodeColor + '44';
+        ctx.beginPath();
+        ctx.arc(x, y, nodeSize * 1.5, 0, 2 * Math.PI);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+      }
+
+      // Always draw the base colored circle first
+      ctx.fillStyle = nodeColor;
       ctx.beginPath();
-      ctx.arc(node.x, node.y, nodeSize * 1.5, 0, 2 * Math.PI);
+      ctx.arc(x, y, nodeSize, 0, 2 * Math.PI);
       ctx.fill();
-      ctx.shadowBlur = 0;
-    }
-    
-    // Draw node
-    ctx.fillStyle = nodeColor;
-    ctx.beginPath();
-    ctx.arc(node.x, node.y, nodeSize, 0, 2 * Math.PI);
-    ctx.fill();
-    
-    // Draw border for selected/hovered
-    if (isHovered || isSelected) {
-      ctx.strokeStyle = '#fff';
-      ctx.lineWidth = isSelected ? 3 : 2;
+
+      // Draw image overlay if available and valid
+      if (
+        node.image &&
+        node.image.startsWith('http') &&
+        (isHovered || node.depth === 0 || globalScale > 1.5)
+      ) {
+        // Check if image is cached
+        let img = imageCache.get(node.id);
+
+        if (!img) {
+          // Create and cache the image
+          img = new Image();
+          img.crossOrigin = 'anonymous';
+          img.src = node.image;
+          imageCache.set(node.id, img);
+
+          // Load image asynchronously and trigger re-render when ready
+          img.onload = () => {
+            // Force a re-render to display the loaded image
+            forceUpdate({});
+          };
+        }
+
+        // Draw image if it's loaded
+        if (img.complete && img.naturalWidth > 0) {
+          ctx.save();
+          ctx.beginPath();
+          ctx.arc(x, y, nodeSize - 1, 0, 2 * Math.PI);
+          ctx.clip();
+          ctx.drawImage(
+            img,
+            x - nodeSize,
+            y - nodeSize,
+            nodeSize * 2,
+            nodeSize * 2
+          );
+          ctx.restore();
+
+          // Draw border on image
+          ctx.strokeStyle = nodeColor;
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.arc(x, y, nodeSize, 0, 2 * Math.PI);
+          ctx.stroke();
+        }
+      }
+
+      // Draw border for selected/hovered
+      if (isHovered || isSelected) {
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = isSelected ? 3 : 2;
+        ctx.stroke();
+      }
+
+      // Draw label
+      ctx.font = `${fontSize}px Inter, system-ui, sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+
+      // Text background for readability
+      if (isHovered || node.depth === 0 || globalScale > 1) {
+        const textWidth = ctx.measureText(label).width;
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+        ctx.fillRect(
+          x - textWidth / 2 - 2,
+          y + nodeSize + 3,
+          textWidth + 4,
+          fontSize + 4
+        );
+
+        ctx.fillStyle = '#fff';
+        ctx.fillText(label, x, y + nodeSize + fontSize);
+      }
+    },
+    [hoveredNode, selectedNode, getNodeColor, imageCache, forceUpdate]
+  );
+
+  const linkCanvasObject = useCallback(
+    (link: ForceGraphLink, ctx: CanvasRenderingContext2D) => {
+      const start = link.source as ForceGraphNode;
+      const end = link.target as ForceGraphNode;
+
+      if (!start || !end) return;
+
+      const startX = start.x ?? 0;
+      const startY = start.y ?? 0;
+      const endX = end.x ?? 0;
+      const endY = end.y ?? 0;
+
+      if (
+        !Number.isFinite(startX) ||
+        !Number.isFinite(startY) ||
+        !Number.isFinite(endX) ||
+        !Number.isFinite(endY)
+      )
+        return;
+
+      const gradient = ctx.createLinearGradient(startX, startY, endX, endY);
+      const startColor = getNodeColor(start);
+      const endColor = getNodeColor(end);
+
+      gradient.addColorStop(0, startColor + '33');
+      gradient.addColorStop(1, endColor + '33');
+
+      ctx.strokeStyle = gradient;
+      ctx.lineWidth = Math.max(0.5, link.value * 2);
+      ctx.globalAlpha = 0.3 + link.value * 0.4;
+
+      ctx.beginPath();
+      ctx.moveTo(startX, startY);
+      ctx.lineTo(endX, endY);
       ctx.stroke();
-    }
-    
-    // Draw label
-    ctx.font = `${fontSize}px Inter, system-ui, sans-serif`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    
-    // Text background for readability
-    if (isHovered || node.depth === 0 || globalScale > 1) {
-      const textWidth = ctx.measureText(label).width;
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-      ctx.fillRect(
-        node.x - textWidth / 2 - 2,
-        node.y + nodeSize + 3,
-        textWidth + 4,
-        fontSize + 4
-      );
-      
-      ctx.fillStyle = '#fff';
-      ctx.fillText(label, node.x, node.y + nodeSize + fontSize);
-    }
-  }, [hoveredNode, selectedNode, getNodeColor]);
 
-  const linkCanvasObject = useCallback((link: any, ctx: CanvasRenderingContext2D) => { // eslint-disable-line @typescript-eslint/no-explicit-any
-    const start = link.source;
-    const end = link.target;
-    
-    if (!start || !end) return;
-    if (!Number.isFinite(start.x) || !Number.isFinite(start.y) || 
-        !Number.isFinite(end.x) || !Number.isFinite(end.y)) return;
-    
-    const gradient = ctx.createLinearGradient(start.x, start.y, end.x, end.y);
-    const startColor = getNodeColor(start);
-    const endColor = getNodeColor(end);
-    
-    gradient.addColorStop(0, startColor + '33');
-    gradient.addColorStop(1, endColor + '33');
-    
-    ctx.strokeStyle = gradient;
-    ctx.lineWidth = Math.max(0.5, link.value * 2);
-    ctx.globalAlpha = 0.3 + link.value * 0.4;
-    
-    ctx.beginPath();
-    ctx.moveTo(start.x, start.y);
-    ctx.lineTo(end.x, end.y);
-    ctx.stroke();
-    
-    ctx.globalAlpha = 1;
-  }, [getNodeColor]);
+      ctx.globalAlpha = 1;
+    },
+    [getNodeColor]
+  );
 
-  const handleNodeClick = useCallback((node: any) => { // eslint-disable-line @typescript-eslint/no-explicit-any
-    if (onNodeClick) {
-      onNodeClick(node as GraphNode);
-    }
-  }, [onNodeClick]);
+  const handleNodeClick = useCallback(
+    (node: ForceGraphNode) => {
+      if (onNodeClick) {
+        onNodeClick(node as GraphNode);
+      }
+    },
+    [onNodeClick]
+  );
 
-  const handleNodeHover = useCallback((node: any) => { // eslint-disable-line @typescript-eslint/no-explicit-any
-    setHoveredNode(node?.id || null);
-    if (onNodeHover) {
-      onNodeHover(node as GraphNode | null);
-    }
-  }, [onNodeHover]);
+  const handleNodeHover = useCallback(
+    (node: ForceGraphNode | null) => {
+      setHoveredNode(node?.id || null);
+      if (onNodeHover) {
+        onNodeHover(node as GraphNode | null);
+      }
+    },
+    [onNodeHover]
+  );
 
   return (
     <div className="relative w-full h-full bg-gradient-to-br from-gray-900 via-purple-900/20 to-gray-900">
-      <div className="absolute inset-0 opacity-20" style={{
-        backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' xmlns='http://www.w3.org/2000/svg'%3E%3Cdefs%3E%3Cpattern id='grid' width='60' height='60' patternUnits='userSpaceOnUse'%3E%3Cpath d='M 60 0 L 0 0 0 60' fill='none' stroke='white' stroke-width='0.5' opacity='0.1'/%3E%3C/pattern%3E%3C/defs%3E%3Crect width='100%25' height='100%25' fill='url(%23grid)'/%3E%3C/svg%3E")`
-      }} />
-      
+      <div
+        className="absolute inset-0 opacity-20"
+        style={{
+          backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' xmlns='http://www.w3.org/2000/svg'%3E%3Cdefs%3E%3Cpattern id='grid' width='60' height='60' patternUnits='userSpaceOnUse'%3E%3Cpath d='M 60 0 L 0 0 0 60' fill='none' stroke='white' stroke-width='0.5' opacity='0.1'/%3E%3C/pattern%3E%3C/defs%3E%3Crect width='100%25' height='100%25' fill='url(%23grid)'/%3E%3C/svg%3E")`,
+        }}
+      />
+
       <ForceGraph2D
         ref={graphRef}
         graphData={data}
@@ -192,7 +296,7 @@ export default function MusicGraph({ data, onNodeClick, onNodeHover, selectedNod
         cooldownTicks={100}
         onEngineStop={() => graphRef.current?.zoomToFit(400, 50)}
       />
-      
+
       {/* Controls hint */}
       <div className="absolute bottom-4 left-4 bg-black/50 backdrop-blur-sm rounded-lg px-4 py-2 text-white/70 text-sm">
         <div>Scroll to zoom • Drag to pan • Click artist to explore</div>

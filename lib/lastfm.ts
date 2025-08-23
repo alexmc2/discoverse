@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { getArtistImage } from './spotify';
 
 // Use local API route to avoid CORS issues
 const BASE_URL = '/api/lastfm';
@@ -156,13 +157,19 @@ export async function buildGraphData(seedArtist: string, depth: number = 2) {
   const links: GraphLink[] = [];
   const processed = new Set<string>();
   
-  // Add seed artist
-  const seedTags = await getArtistTags(seedArtist);
+  // Add seed artist with full info including image from Spotify
+  const [seedTags, seedInfo, spotifyImage] = await Promise.all([
+    getArtistTags(seedArtist),
+    getArtistInfo(seedArtist),
+    getArtistImage(seedArtist)
+  ]);
+  
   const seedNode: GraphNode = {
     id: seedArtist,
     name: seedArtist,
     group: seedTags[0] || 'unknown',
     size: 20,
+    image: spotifyImage || seedInfo?.image,
     tags: seedTags,
     depth: 0
   };
@@ -170,6 +177,17 @@ export async function buildGraphData(seedArtist: string, depth: number = 2) {
   
   // Get similar artists (depth 1)
   const similar = await getSimilarArtists(seedArtist, 15);
+  
+  // Fetch Spotify images for all similar artists in parallel
+  const artistNames = similar.map(a => a.name);
+  const spotifyImagePromises = artistNames.map(name => getArtistImage(name));
+  const spotifyImages = await Promise.all(spotifyImagePromises);
+  const imageMap = new Map<string, string | undefined>();
+  artistNames.forEach((name, i) => {
+    if (spotifyImages[i]) {
+      imageMap.set(name, spotifyImages[i]);
+    }
+  });
   
   for (const artist of similar) {
     if (!nodes.has(artist.name)) {
@@ -179,7 +197,7 @@ export async function buildGraphData(seedArtist: string, depth: number = 2) {
         name: artist.name,
         group: tags[0] || 'unknown',
         size: 10,
-        image: artist.image,
+        image: imageMap.get(artist.name) || artist.image,
         tags,
         depth: 1
       });
