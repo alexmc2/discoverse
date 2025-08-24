@@ -4,13 +4,13 @@
 import { useState, useCallback, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import { AnimatePresence } from 'framer-motion';
-import ArtistPanel from '@/components/ArtistPanel';
-import LoadingScreen from '@/components/LoadingScreen';
+import ArtistPanel from '@/components/artist-panel';
+import LoadingScreen from '@/components/loading-screen';
 import Header from '@/components/ui/header';
-import DefaultContent from '@/components/DefaultContent';
+import DefaultContent from '@/components/default-content';
 import { buildGraphData, GraphNode, GraphLink } from '@/lib/lastfm';
 
-const MusicGraph = dynamic(() => import('@/components/MusicGraph'), {
+const MusicGraph = dynamic(() => import('@/components/music-graph'), {
   ssr: false,
   loading: () => <LoadingScreen message="Initializing graph engine..." />,
 });

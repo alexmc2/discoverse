@@ -1,7 +1,7 @@
 'use client';
 
 import { Music2 } from 'lucide-react';
-import SearchBar from '@/components/SearchBar';
+import SearchBar from '@/components/search-bar';
 
 interface HeaderProps {
   onSearch: (artistName: string) => void;
