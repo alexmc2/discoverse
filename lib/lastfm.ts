@@ -79,8 +79,8 @@ export async function searchArtist(query: string): Promise<Artist[]> {
     const data = await fetchWithCache(url);
     const artists = data?.results?.artistmatches?.artist || [];
     
-    return artists.map((artist: LastFmArtist) => ({
-      id: artist.mbid || artist.name,
+    return artists.map((artist: LastFmArtist, index: number) => ({
+      id: artist.mbid ? `${artist.mbid}-${index}` : `${artist.name}-${index}`,
       name: artist.name,
       url: artist.url,
       image: artist.image?.find(img => img.size === 'large')?.['#text']
@@ -98,8 +98,8 @@ export async function getSimilarArtists(artistName: string, limit: number = 20):
     const data = await fetchWithCache(url);
     const similar = data?.similarartists?.artist || [];
     
-    return similar.map((artist: LastFmArtist) => ({
-      id: artist.mbid || artist.name,
+    return similar.map((artist: LastFmArtist, index: number) => ({
+      id: artist.mbid ? `${artist.mbid}-${index}` : `${artist.name}-${index}`,
       name: artist.name,
       match: parseFloat(artist.match || '0'),
       url: artist.url,

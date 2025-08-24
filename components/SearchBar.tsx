@@ -5,6 +5,7 @@ import Image from 'next/image';
 import { Search, X, Music } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { searchArtist, Artist } from '@/lib/lastfm';
+import { getArtistImage } from '@/lib/spotify';
 
 interface SearchBarProps {
   onSearch: (artist: string) => void;
@@ -40,7 +41,19 @@ export default function SearchBar({ onSearch, isLoading }: SearchBarProps) {
     
     debounceRef.current = setTimeout(async () => {
       const results = await searchArtist(query);
-      setSuggestions(results);
+      
+      // Fetch Spotify images for search results
+      const enhancedResults = await Promise.all(
+        results.map(async (artist) => {
+          if (!artist.image) {
+            const spotifyImage = await getArtistImage(artist.name);
+            return { ...artist, image: spotifyImage || artist.image };
+          }
+          return artist;
+        })
+      );
+      
+      setSuggestions(enhancedResults);
       setShowSuggestions(true);
     }, 300);
 

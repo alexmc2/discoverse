@@ -5,6 +5,7 @@ import Image from 'next/image';
 import { X, ExternalLink, Music, Users, Play, Maximize2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { getArtistInfo } from '@/lib/lastfm';
+import { getArtistImage } from '@/lib/spotify';
 
 interface ArtistPanelProps {
   artistName: string | null;
@@ -35,8 +36,18 @@ export default function ArtistPanel({ artistName, onClose, onExpand }: ArtistPan
     const fetchArtistInfo = async () => {
       setLoading(true);
       try {
-        const info = await getArtistInfo(artistName);
-        setArtist(info);
+        const [info, spotifyImage] = await Promise.all([
+          getArtistInfo(artistName),
+          getArtistImage(artistName)
+        ]);
+        
+        // Use Spotify image if available, otherwise fall back to Last.fm image
+        if (info) {
+          setArtist({
+            ...info,
+            image: spotifyImage || info.image
+          });
+        }
       } catch (error) {
         console.error('Failed to fetch artist info:', error);
       } finally {
