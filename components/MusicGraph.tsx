@@ -1,3 +1,4 @@
+// components/MusicGraph.tsx
 'use client';
 
 import { useEffect, useRef, useState, useCallback } from 'react';
@@ -100,7 +101,6 @@ export default function MusicGraph({
       ctx: CanvasRenderingContext2D,
       globalScale: number
     ) => {
-      // Force-graph ensures x, y are available during rendering
       const x = node.x ?? 0;
       const y = node.y ?? 0;
       const label = node.name;
@@ -110,7 +110,6 @@ export default function MusicGraph({
       const isHovered = hoveredNode === node.id;
       const isSelected = selectedNode === node.id;
 
-      // Draw glow effect
       if (isHovered || isSelected || node.depth === 0) {
         ctx.shadowColor = nodeColor;
         ctx.shadowBlur = isSelected ? 30 : isHovered ? 20 : 15;
@@ -121,36 +120,28 @@ export default function MusicGraph({
         ctx.shadowBlur = 0;
       }
 
-      // Always draw the base colored circle first
       ctx.fillStyle = nodeColor;
       ctx.beginPath();
       ctx.arc(x, y, nodeSize, 0, 2 * Math.PI);
       ctx.fill();
 
-      // Draw image overlay if available and valid
       if (
         node.image &&
         node.image.startsWith('http') &&
         (isHovered || node.depth === 0 || globalScale > 1.5)
       ) {
-        // Check if image is cached
         let img = imageCache.get(node.id);
 
         if (!img) {
-          // Create and cache the image
           img = new Image();
           img.crossOrigin = 'anonymous';
           img.src = node.image;
           imageCache.set(node.id, img);
-
-          // Load image asynchronously and trigger re-render when ready
           img.onload = () => {
-            // Force a re-render to display the loaded image
             forceUpdate({});
           };
         }
 
-        // Draw image if it's loaded
         if (img.complete && img.naturalWidth > 0) {
           ctx.save();
           ctx.beginPath();
@@ -165,7 +156,6 @@ export default function MusicGraph({
           );
           ctx.restore();
 
-          // Draw border on image
           ctx.strokeStyle = nodeColor;
           ctx.lineWidth = 2;
           ctx.beginPath();
@@ -174,19 +164,16 @@ export default function MusicGraph({
         }
       }
 
-      // Draw border for selected/hovered
       if (isHovered || isSelected) {
         ctx.strokeStyle = '#fff';
         ctx.lineWidth = isSelected ? 3 : 2;
         ctx.stroke();
       }
 
-      // Draw label
       ctx.font = `${fontSize}px Inter, system-ui, sans-serif`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
 
-      // Text background for readability
       if (isHovered || node.depth === 0 || globalScale > 1) {
         const textWidth = ctx.measureText(label).width;
         ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
@@ -224,12 +211,11 @@ export default function MusicGraph({
       )
         return;
 
+      // Gradient: sky-600 → blue-600 → indigo-600
       const gradient = ctx.createLinearGradient(startX, startY, endX, endY);
-      const startColor = getNodeColor(start);
-      const endColor = getNodeColor(end);
-
-      gradient.addColorStop(0, startColor + '33');
-      gradient.addColorStop(1, endColor + '33');
+      gradient.addColorStop(0, '#0284c733'); // sky-600 @ 20%
+      gradient.addColorStop(0.5, '#2563eb33'); // blue-600 @ 20%
+      gradient.addColorStop(1, '#4f46e533'); // indigo-600 @ 20%
 
       ctx.strokeStyle = gradient;
       ctx.lineWidth = Math.max(0.5, link.value * 2);
@@ -242,7 +228,7 @@ export default function MusicGraph({
 
       ctx.globalAlpha = 1;
     },
-    [getNodeColor]
+    []
   );
 
   const handleNodeClick = useCallback(
@@ -265,7 +251,7 @@ export default function MusicGraph({
   );
 
   return (
-    <div className="relative w-full h-full bg-gradient-to-br from-gray-900 via-purple-900/20 to-gray-900">
+    <div className="relative w-full h-full bg-gradient-to-br from-sky-950/10 via-blue-900/10 to-indigo-950/10">
       <div
         className="absolute inset-0 opacity-20"
         style={{
@@ -288,7 +274,11 @@ export default function MusicGraph({
         nodeVal="size"
         linkSource="source"
         linkTarget="target"
-        nodePointerAreaPaint={(node: ForceGraphNode, color: string, ctx: CanvasRenderingContext2D) => {
+        nodePointerAreaPaint={(
+          node: ForceGraphNode,
+          color: string,
+          ctx: CanvasRenderingContext2D
+        ) => {
           const x = node.x ?? 0;
           const y = node.y ?? 0;
           const nodeSize = node.size || 10;
@@ -305,7 +295,6 @@ export default function MusicGraph({
         cooldownTicks={100}
         onEngineStop={() => graphRef.current?.zoomToFit(400, 50)}
       />
-
     </div>
   );
 }

@@ -1,3 +1,4 @@
+// app/api/lastfm/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 
 const API_KEY = process.env.NEXT_PUBLIC_LASTFM_API_KEY || '';

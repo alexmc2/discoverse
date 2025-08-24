@@ -1,3 +1,4 @@
+// components/ArtistPanel.tsx
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -23,7 +24,11 @@ interface ArtistDetails {
   tags: string[];
 }
 
-export default function ArtistPanel({ artistName, onClose, onExpand }: ArtistPanelProps) {
+export default function ArtistPanel({
+  artistName,
+  onClose,
+  onExpand,
+}: ArtistPanelProps) {
   const [artist, setArtist] = useState<ArtistDetails | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -38,14 +43,13 @@ export default function ArtistPanel({ artistName, onClose, onExpand }: ArtistPan
       try {
         const [info, spotifyImage] = await Promise.all([
           getArtistInfo(artistName),
-          getArtistImage(artistName)
+          getArtistImage(artistName),
         ]);
-        
-        // Use Spotify image if available, otherwise fall back to Last.fm image
+
         if (info) {
           setArtist({
             ...info,
-            image: spotifyImage || info.image
+            image: spotifyImage || info.image,
           });
         }
       } catch (error) {
@@ -81,7 +85,7 @@ export default function ArtistPanel({ artistName, onClose, onExpand }: ArtistPan
                 <h2 className="text-xl font-bold text-white">Artist Details</h2>
                 <button
                   onClick={onClose}
-                  className="p-2 hover:bg-gray-800 rounded-lg transition-colors"
+                  className="p-2 rounded-lg transition-colors hover:bg-gradient-to-r hover:from-sky-900/30 hover:via-blue-900/30 hover:to-indigo-900/30"
                 >
                   <X className="w-5 h-5 text-gray-400" />
                 </button>
@@ -90,7 +94,8 @@ export default function ArtistPanel({ artistName, onClose, onExpand }: ArtistPan
 
             {loading ? (
               <div className="flex items-center justify-center h-64">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500" />
+                {/* spinner with brand tri-shade */}
+                <div className="animate-spin rounded-full h-12 w-12 border-2 border-r-transparent border-b-sky-500 border-l-blue-500 border-t-indigo-500" />
               </div>
             ) : artist ? (
               <div className="p-6 space-y-6">
@@ -102,16 +107,18 @@ export default function ArtistPanel({ artistName, onClose, onExpand }: ArtistPan
                         src={artist.image}
                         alt={artist.name}
                         fill
-                        className="rounded-full object-cover shadow-lg ring-4 ring-purple-500/30"
+                        className="rounded-full object-cover shadow-lg ring-4 ring-sky-500/30"
                         sizes="128px"
                       />
                     </div>
                   ) : (
-                    <div className="w-32 h-32 mx-auto rounded-full bg-gradient-to-br from-purple-600 to-blue-600 flex items-center justify-center shadow-lg">
+                    <div className="w-32 h-32 mx-auto rounded-full bg-gradient-to-br from-sky-600 via-blue-600 to-indigo-600 flex items-center justify-center shadow-lg">
                       <Music className="w-12 h-12 text-white" />
                     </div>
                   )}
-                  <h3 className="mt-4 text-2xl font-bold text-white">{artist.name}</h3>
+                  <h3 className="mt-4 text-2xl font-bold text-white">
+                    {artist.name}
+                  </h3>
                 </div>
 
                 {/* Stats */}
@@ -139,12 +146,14 @@ export default function ArtistPanel({ artistName, onClose, onExpand }: ArtistPan
                 {/* Tags */}
                 {artist.tags.length > 0 && (
                   <div>
-                    <h4 className="text-sm font-medium text-gray-400 mb-2">Genres & Tags</h4>
+                    <h4 className="text-sm font-medium text-gray-400 mb-2">
+                      Genres & Tags
+                    </h4>
                     <div className="flex flex-wrap gap-2">
                       {artist.tags.map((tag, index) => (
                         <span
                           key={index}
-                          className="px-3 py-1 bg-purple-900/30 text-purple-300 rounded-full text-sm"
+                          className="px-3 py-1 rounded-full text-sm text-white bg-gradient-to-r from-sky-900/30 via-blue-900/30 to-indigo-900/30 border border-blue-800/40"
                         >
                           {tag}
                         </span>
@@ -156,7 +165,9 @@ export default function ArtistPanel({ artistName, onClose, onExpand }: ArtistPan
                 {/* Bio */}
                 {artist.bio && (
                   <div>
-                    <h4 className="text-sm font-medium text-gray-400 mb-2">About</h4>
+                    <h4 className="text-sm font-medium text-gray-400 mb-2">
+                      About
+                    </h4>
                     <p className="text-gray-300 text-sm leading-relaxed line-clamp-6">
                       {artist.bio}
                     </p>
@@ -168,18 +179,18 @@ export default function ArtistPanel({ artistName, onClose, onExpand }: ArtistPan
                   {onExpand && (
                     <button
                       onClick={() => onExpand(artist.name)}
-                      className="w-full px-4 py-3 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg font-medium hover:from-purple-700 hover:to-blue-700 transition-all duration-300 flex items-center justify-center gap-2"
+                      className="w-full px-4 py-3 bg-gradient-to-r from-sky-600 via-blue-600 to-indigo-600 text-white rounded-lg font-medium transition-all duration-300 hover:brightness-110 flex items-center justify-center gap-2"
                     >
                       <Maximize2 className="w-4 h-4" />
                       Explore from this artist
                     </button>
                   )}
-                  
+
                   <a
                     href={artist.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="w-full px-4 py-3 bg-gray-800 text-white rounded-lg font-medium hover:bg-gray-700 transition-colors flex items-center justify-center gap-2"
+                    className="w-full px-4 py-3 bg-gray-800 text-white rounded-lg font-medium hover:bg-gradient-to-r hover:from-sky-900/30 hover:via-blue-900/30 hover:to-indigo-900/30 transition-colors flex items-center justify-center gap-2"
                   >
                     <ExternalLink className="w-4 h-4" />
                     View on Last.fm

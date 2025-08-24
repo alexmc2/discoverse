@@ -6,6 +6,7 @@ import { Search, X, Music } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { searchArtist, Artist } from '@/lib/lastfm';
 import { getArtistImage } from '@/lib/spotify';
+import { Input } from '@/components/ui/input';
 
 interface SearchBarProps {
   onSearch: (artist: string) => void;
@@ -26,7 +27,6 @@ export default function SearchBar({ onSearch, isLoading }: SearchBarProps) {
         setShowSuggestions(false);
       }
     };
-
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
@@ -36,13 +36,10 @@ export default function SearchBar({ onSearch, isLoading }: SearchBarProps) {
       setSuggestions([]);
       return;
     }
-
     if (debounceRef.current) clearTimeout(debounceRef.current);
-    
+
     debounceRef.current = setTimeout(async () => {
       const results = await searchArtist(query);
-      
-      // Fetch Spotify images for search results
       const enhancedResults = await Promise.all(
         results.map(async (artist) => {
           if (!artist.image) {
@@ -52,7 +49,6 @@ export default function SearchBar({ onSearch, isLoading }: SearchBarProps) {
           return artist;
         })
       );
-      
       setSuggestions(enhancedResults);
       setShowSuggestions(true);
     }, 300);
@@ -83,13 +79,13 @@ export default function SearchBar({ onSearch, isLoading }: SearchBarProps) {
     switch (e.key) {
       case 'ArrowDown':
         e.preventDefault();
-        setSelectedIndex(prev => 
+        setSelectedIndex((prev) =>
           prev < suggestions.length - 1 ? prev + 1 : 0
         );
         break;
       case 'ArrowUp':
         e.preventDefault();
-        setSelectedIndex(prev => 
+        setSelectedIndex((prev) =>
           prev > 0 ? prev - 1 : suggestions.length - 1
         );
         break;
@@ -107,38 +103,34 @@ export default function SearchBar({ onSearch, isLoading }: SearchBarProps) {
   };
 
   return (
-    <div ref={searchRef} className="relative w-full max-w-2xl mx-auto">
+    <div ref={searchRef} className="relative w-full max-w-2xl">
       <form onSubmit={handleSubmit} className="relative">
-        <div className="relative group">
-          <div className="absolute -inset-0.5 bg-gradient-to-r from-purple-600 to-blue-600 rounded-2xl blur opacity-30 group-hover:opacity-50 transition duration-300" />
-          
-          <div className="relative flex items-center">
-            <input
-              type="text"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              onKeyDown={handleKeyDown}
-              onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
-              placeholder="Search for an artist or band..."
-              disabled={isLoading}
-              className="w-full px-6 py-4 pl-14 pr-12 bg-gray-900/90 backdrop-blur-xl border border-gray-800 rounded-2xl text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 transition-all duration-300 disabled:opacity-50"
-            />
-            
-            <Search className="absolute left-5 w-5 h-5 text-gray-500" />
-            
-            {query && (
-              <button
-                type="button"
-                onClick={() => {
-                  setQuery('');
-                  setSuggestions([]);
-                }}
-                className="absolute right-4 p-1 text-gray-500 hover:text-white transition-colors"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            )}
-          </div>
+        <div className="relative flex items-center">
+          <Input
+            type="text"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={handleKeyDown}
+            onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
+            placeholder="Search for an artist or band..."
+            disabled={isLoading}
+            className="w-full h-12 pl-12 pr-10 bg-gray-900/90 backdrop-blur-xl border-gray-800 text-white placeholder-gray-500 focus:border-sky-500"
+          />
+
+          <Search className="absolute left-4 w-5 h-5 text-gray-500" />
+
+          {query && (
+            <button
+              type="button"
+              onClick={() => {
+                setQuery('');
+                setSuggestions([]);
+              }}
+              className="absolute right-3 p-1 text-gray-500 hover:text-white transition-colors"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
         </div>
       </form>
 
@@ -157,14 +149,16 @@ export default function SearchBar({ onSearch, isLoading }: SearchBarProps) {
                   key={artist.id}
                   onClick={() => handleSelectSuggestion(artist)}
                   onMouseEnter={() => setSelectedIndex(index)}
-                  className={`w-full px-4 py-3 flex items-center gap-3 hover:bg-purple-900/30 transition-colors text-left ${
-                    index === selectedIndex ? 'bg-purple-900/30' : ''
+                  className={`w-full px-4 py-3 flex items-center gap-3 transition-colors text-left ${
+                    index === selectedIndex
+                      ? 'bg-gradient-to-r from-sky-900/30 via-blue-900/30 to-indigo-900/30'
+                      : 'hover:bg-gradient-to-r hover:from-sky-900/20 hover:via-blue-900/20 hover:to-indigo-900/20'
                   }`}
                 >
                   {artist.image ? (
                     <div className="relative w-10 h-10">
-                      <Image 
-                        src={artist.image} 
+                      <Image
+                        src={artist.image}
                         alt={artist.name}
                         fill
                         className="rounded-full object-cover"
@@ -172,7 +166,7 @@ export default function SearchBar({ onSearch, isLoading }: SearchBarProps) {
                       />
                     </div>
                   ) : (
-                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-600 to-blue-600 flex items-center justify-center">
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-sky-600 via-blue-600 to-indigo-600 flex items-center justify-center">
                       <Music className="w-5 h-5 text-white" />
                     </div>
                   )}

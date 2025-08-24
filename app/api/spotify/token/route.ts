@@ -1,3 +1,4 @@
+// app/api/spotify/token/route.ts
 import { NextResponse } from 'next/server';
 
 // Spotify Client Credentials

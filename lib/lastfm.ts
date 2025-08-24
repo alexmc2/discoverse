@@ -1,3 +1,4 @@
+// lib/lastfm.ts
 import axios from 'axios';
 import { getArtistImage } from './spotify';
 

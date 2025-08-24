@@ -1,3 +1,4 @@
+// lib/spotify.ts
 // Spotify Web API integration for artist images
 // Using Client Credentials flow (no user authentication required)
 
