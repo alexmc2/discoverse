@@ -2,6 +2,7 @@
 import type { Metadata } from "next";
 import { Inter, Inter_Tight } from "next/font/google";
 import "./globals.css";
+import Cursor from "@/components/ui/cursor";
 
 const inter = Inter({
   variable: "--font-geist-sans",
@@ -35,6 +36,7 @@ export default function RootLayout({
       <body
         className={`${inter.variable} ${interTight.variable} antialiased`}
       >
+        <Cursor className="hidden lg:block" />
         {children}
       </body>
     </html>

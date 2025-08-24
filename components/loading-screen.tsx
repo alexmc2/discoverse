@@ -18,7 +18,7 @@ export default function LoadingScreen({
       exit={{ opacity: 0 }}
       className="fixed inset-0 bg-gray-950/95 backdrop-blur-xl z-50 flex items-center justify-center"
     >
-      <div className="text-center">
+      <div className="text-center -mt-16 sm:-mt-20 md:-mt-24">
         <Player
           autoplay
           loop

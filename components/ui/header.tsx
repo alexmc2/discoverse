@@ -21,7 +21,7 @@ export default function Header({
   error,
 }: HeaderProps) {
   return (
-    <header className="fixed top-0 left-0 right-0 z-40 px-4 sm:px-8 p-6 sm:pt-8 pb-6">
+    <header className="fixed top-0 left-0 right-0 z-40 px-4 sm:px-6 p-6 sm:pt-6 pb-6">
       <div className="flex items-center gap-2 mb-4">
         <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-gradient-to-br from-sky-600 via-blue-600 to-indigo-600">
           <Music2 className="w-6 h-6 text-white" />

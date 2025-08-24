@@ -17,7 +17,7 @@ export default function DefaultContent({ onSearch }: DefaultContentProps) {
 
   return (
     <div className="flex items-center justify-center h-full">
-      <div className="text-center px-6">
+      <div className="text-center px-6 -mt-16 sm:-mt-20 md:-mt-24">
         <div className="w-32 h-32 mx-auto mb-8 relative">
           <div className="absolute inset-0 rounded-full blur-2xl opacity-50 animate-pulse-glow bg-gradient-to-r from-sky-600 via-blue-600 to-indigo-600" />
           <div className="relative w-full h-full rounded-full flex items-center justify-center bg-gradient-to-r from-sky-600 via-blue-600 to-indigo-600">
@@ -29,7 +29,6 @@ export default function DefaultContent({ onSearch }: DefaultContentProps) {
           Discover Musical Connections
         </h2>
         <p className="text-gray-400 max-w-md mx-auto mb-8">
-          Search for any artist or band to explore their musical universe.
           See how artists connect through genres and influences in an
           interactive constellation.
         </p>
