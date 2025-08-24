@@ -110,7 +110,7 @@ export async function getArtistImage(artistName: string): Promise<string | undef
     
     return undefined;
   } catch (error) {
-    // Silently fail and return undefined - we'll use fallback sources
+    console.error(`Error getting Spotify image for ${artistName}:`, error);
     return undefined;
   }
 }

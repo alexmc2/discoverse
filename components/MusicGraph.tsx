@@ -61,7 +61,7 @@ export default function MusicGraph({
     const handleResize = () => {
       setDimensions({
         width: window.innerWidth,
-        height: window.innerHeight - 120,
+        height: window.innerHeight,
       });
     };
 
@@ -288,6 +288,15 @@ export default function MusicGraph({
         nodeVal="size"
         linkSource="source"
         linkTarget="target"
+        nodePointerAreaPaint={(node: ForceGraphNode, color: string, ctx: CanvasRenderingContext2D) => {
+          const x = node.x ?? 0;
+          const y = node.y ?? 0;
+          const nodeSize = node.size || 10;
+          ctx.fillStyle = color;
+          ctx.beginPath();
+          ctx.arc(x, y, nodeSize * 1.2, 0, 2 * Math.PI);
+          ctx.fill();
+        }}
         enableNodeDrag={true}
         enableZoomInteraction={true}
         enablePanInteraction={true}
@@ -297,10 +306,6 @@ export default function MusicGraph({
         onEngineStop={() => graphRef.current?.zoomToFit(400, 50)}
       />
 
-      {/* Controls hint */}
-      <div className="absolute bottom-4 left-4 bg-black/50 backdrop-blur-sm rounded-lg px-4 py-2 text-white/70 text-sm">
-        <div>Scroll to zoom • Drag to pan • Click artist to explore</div>
-      </div>
     </div>
   );
 }

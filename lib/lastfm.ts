@@ -230,13 +230,16 @@ export async function buildGraphData(seedArtist: string, depth: number = 2) {
           });
         } else if (!nodes.has(related.name) && nodes.size < 100) {
           // Add new nodes up to limit
-          const tags = await getArtistTags(related.name);
+          const [tags, spotifyImage] = await Promise.all([
+            getArtistTags(related.name),
+            getArtistImage(related.name)
+          ]);
           nodes.set(related.name, {
             id: related.name,
             name: related.name,
             group: tags[0] || 'unknown',
             size: 5,
-            image: related.image,
+            image: spotifyImage || related.image,
             tags,
             depth: 2
           });
