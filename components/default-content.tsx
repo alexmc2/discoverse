@@ -16,21 +16,21 @@ type DefaultContentProps = {
   onSearch: (artistName: string) => void;
 };
 
-const FALLBACK_ARTISTS = [
-  'The Beatles',
-  'Radiohead',
-  'Daft Punk',
-  'Taylor Swift',
-  'Pink Floyd',
-] as const;
-
 export default function DefaultContent({ onSearch }: DefaultContentProps) {
-  const [randomArtist, setRandomArtist] = useState<string>('');
+  const [randomArtists, setRandomArtists] = useState<string[]>([]);
 
   useEffect(() => {
-    // Pick a random artist for the button
-    const randomIndex = Math.floor(Math.random() * FALLBACK_ARTISTS.length);
-    setRandomArtist(FALLBACK_ARTISTS[randomIndex]);
+    // Fetch random artists from the API
+    fetch('/api/random-artists')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.artists && data.artists.length > 0) {
+          setRandomArtists(data.artists);
+        }
+      })
+      .catch((err) => {
+        console.error('Failed to fetch random artists:', err);
+      });
   }, []);
 
   return (
@@ -63,19 +63,16 @@ export default function DefaultContent({ onSearch }: DefaultContentProps) {
         </p>
 
         <div className="flex flex-wrap gap-2 justify-center min-h-[44px]">
-          {/* Random artist button */}
-          {randomArtist && (
+          {/* Random artist buttons */}
+          {randomArtists.map((artist) => (
             <button
-              onClick={() => onSearch(randomArtist)}
-              className="px-6 py-3 bg-gradient-to-r from-sky-600 via-blue-600 to-indigo-600 
-                         text-white font-semibold rounded-lg
-                         hover:from-sky-500 hover:via-blue-500 hover:to-indigo-500
-                         transition-all duration-200 transform hover:scale-105 
-                         shadow-lg hover:shadow-xl cursor-pointer"
+              key={artist}
+              onClick={() => onSearch(artist)}
+              className="cursor-pointer px-4 py-2 bg-gray-800/50 text-gray-300 rounded-full text-sm transition-all duration-300 border border-sky-800 hover:text-white hover:bg-gradient-to-r hover:from-sky-900/30 hover:via-blue-900/30 hover:to-indigo-900/30"
             >
-              Try {randomArtist}
+              {artist}
             </button>
-          )}
+          ))}
         </div>
       </div>
     </div>

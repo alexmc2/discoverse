@@ -57,6 +57,7 @@ export default function Header({
 
           {/* Mode Toggle */}
           <div className="flex items-center gap-2 mt-1 ">
+            {/* <span className="text-xs text-gray-400">Mode:</span> */}
             <TooltipProvider>
               <div className="inline-flex rounded-lg border border-gray-700 overflow-hidden ">
                 <Tooltip>
