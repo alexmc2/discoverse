@@ -103,7 +103,8 @@ export default function SearchBar({ onSearch, isLoading }: SearchBarProps) {
   };
 
   return (
-    <div ref={searchRef} className="relative w-full max-w-96 ">
+    // Fill the wrapper — no extra max-w here
+    <div ref={searchRef} className="relative w-full">
       <form onSubmit={handleSubmit} className="relative">
         <div className="relative flex items-center">
           <Input

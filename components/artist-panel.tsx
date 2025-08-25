@@ -1,4 +1,4 @@
-// components/ArtistPanel.tsx
+// components/artist-panel.tsx
 'use client';
 
 import { useEffect, useState } from 'react';

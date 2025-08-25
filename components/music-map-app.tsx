@@ -7,6 +7,7 @@ import ArtistPanel from '@/components/artist-panel';
 import LoadingScreen from '@/components/loading-screen';
 import Header from '@/components/ui/header';
 import DefaultContent from '@/components/default-content';
+import ModeToggle from '@/components/ui/mode-toggle'; // NEW
 import { buildGraphData, GraphNode, GraphLink } from '@/lib/lastfm';
 
 const MusicGraph = dynamic(() => import('@/components/music-graph'), {
@@ -39,7 +40,6 @@ export default function MusicMapApp() {
   const [mode, setMode] = useState<'map' | 'info'>('info');
   const [centerNodeName, setCenterNodeName] = useState<string | null>(null);
 
-  // Simple in-memory cache for expansions
   const expansionCache = useRef<Map<string, GraphData>>(new Map());
 
   useEffect(() => {
@@ -55,13 +55,11 @@ export default function MusicMapApp() {
 
     if (storedGraphData) {
       try {
-        const parsedData = JSON.parse(storedGraphData);
-        setGraphData(parsedData);
+        setGraphData(JSON.parse(storedGraphData));
       } catch (e) {
         console.error('Failed to parse stored graph data:', e);
       }
     }
-
     if (storedHasSearched === 'true') setHasSearched(true);
     if (storedSelectedArtist && storedSelectedArtist !== 'null')
       setSelectedArtist(storedSelectedArtist);
@@ -95,13 +93,11 @@ export default function MusicMapApp() {
     (base: GraphData, incoming: GraphData): GraphData => {
       const nodeById = new Map(base.nodes.map((n) => [n.id, n] as const));
       const nodes: GraphNode[] = [...base.nodes];
-
-      for (const n of incoming.nodes) {
+      for (const n of incoming.nodes)
         if (!nodeById.has(n.id)) {
           nodeById.set(n.id, n);
           nodes.push(n);
         }
-      }
 
       const linkKey = (l: GraphLink) =>
         `${typeof l.source === 'string' ? l.source : l.source}-${
@@ -109,7 +105,6 @@ export default function MusicMapApp() {
         }`;
       const existingLinks = new Set(base.links.map(linkKey));
       const links: GraphLink[] = [...base.links];
-
       for (const l of incoming.links) {
         const k = linkKey(l);
         if (!existingLinks.has(k)) {
@@ -117,7 +112,6 @@ export default function MusicMapApp() {
           links.push(l);
         }
       }
-
       return { nodes, links };
     },
     []
@@ -127,10 +121,8 @@ export default function MusicMapApp() {
     setLoading(true);
     setError(null);
     setHasSearched(true);
-
     try {
       const data = await buildGraphData(artistName);
-
       if (data.nodes.length === 0) {
         setError(
           `No data found for "${artistName}". Please try another artist.`
@@ -139,7 +131,7 @@ export default function MusicMapApp() {
       } else {
         setGraphData(data);
         setSelectedArtist(null);
-        setCenterNodeName(artistName); // ensure center on initial search
+        setCenterNodeName(artistName);
         expansionCache.current.set(artistName.toLowerCase(), data);
       }
     } catch (err) {
@@ -171,10 +163,9 @@ export default function MusicMapApp() {
           }
           expansionCache.current.set(key, data);
         }
-
         setGraphData((prev) => mergeGraphData(prev, data!));
         setSelectedArtist(null);
-        setCenterNodeName(artistName); // request re-center on the new artist
+        setCenterNodeName(artistName);
       } catch (err) {
         console.error('Expand error:', err);
         setError('Failed to expand from artist.');
@@ -187,13 +178,8 @@ export default function MusicMapApp() {
 
   const handleNodeClick = useCallback(
     (node: GraphNode) => {
-      if (mode === 'map') {
-        // In Map mode, clicking expands/merges and recenters
-        expandFromArtist(node.name);
-      } else {
-        // Info mode: open the side panel (existing behavior)
-        setSelectedArtist(node.name);
-      }
+      if (mode === 'map') expandFromArtist(node.name);
+      else setSelectedArtist(node.name);
     },
     [mode, expandFromArtist]
   );
@@ -217,6 +203,8 @@ export default function MusicMapApp() {
     localStorage.removeItem(STORAGE_KEYS.SELECTED_ARTIST);
   }, []);
 
+  const hasData = graphData.nodes.length > 0;
+
   return (
     <div
       className="min-h-screen bg-gradient-to-br from-sky-950/10 via-blue-900/10 to-indigo-950/10 relative overflow-hidden"
@@ -229,7 +217,7 @@ export default function MusicMapApp() {
           onSearch={handleSearch}
           isLoading={loading}
           hasSearched={hasSearched}
-          hasData={graphData.nodes.length > 0}
+          hasData={hasData}
           onClearData={handleClearData}
           error={error}
           mode={mode}
@@ -246,8 +234,7 @@ export default function MusicMapApp() {
         ) : (
           <>
             <AnimatePresence>{loading && <LoadingScreen />}</AnimatePresence>
-
-            {graphData.nodes.length > 0 && (
+            {hasData && (
               <div className="fixed inset-0 overflow-hidden">
                 <MusicGraph
                   data={graphData}
@@ -260,6 +247,11 @@ export default function MusicMapApp() {
           </>
         )}
       </div>
+
+      {/* Show the toggle only after a search AND when there is data, and not while loading */}
+      {hasSearched && hasData && !loading && (
+        <ModeToggle mode={mode} onModeChange={setMode} />
+      )}
 
       <ArtistPanel
         artistName={selectedArtist}

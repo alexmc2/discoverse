@@ -1,7 +1,12 @@
+// components/music-graph.tsx
 'use client';
 
 import { useEffect, useRef, useState, useCallback } from 'react';
-import ForceGraph2D from 'react-force-graph-2d';
+import ForceGraph2D, {
+  ForceGraphMethods,
+  NodeObject,
+  LinkObject,
+} from 'react-force-graph-2d';
 import { GraphNode, GraphLink } from '@/lib/lastfm';
 
 interface ForceGraphNode extends GraphNode {
@@ -42,6 +47,24 @@ const genreColors: Record<string, string> = {
   unknown: '#95A5A6',
 };
 
+// Lighten a hex color toward white by `strength` (0..1)
+const lightenHex = (hex: string, strength = 0.45): string => {
+  const n = hex.replace('#', '');
+  if (n.length !== 6) return hex;
+  const r = parseInt(n.slice(0, 2), 16);
+  const g = parseInt(n.slice(2, 4), 16);
+  const b = parseInt(n.slice(4, 6), 16);
+  const lr = Math.round(r + (255 - r) * strength);
+  const lg = Math.round(g + (255 - g) * strength);
+  const lb = Math.round(b + (255 - b) * strength);
+  const toHex = (v: number) => v.toString(16).padStart(2, '0');
+  return `#${toHex(lr)}${toHex(lg)}${toHex(lb)}`;
+};
+
+
+type RFNode = NodeObject<ForceGraphNode>;
+type RFLink = LinkObject<ForceGraphNode, ForceGraphLink>;
+
 export default function MusicGraph({
   data,
   onNodeClick,
@@ -49,13 +72,36 @@ export default function MusicGraph({
   selectedNode,
   centerNodeName,
 }: MusicGraphProps) {
-  const graphRef = useRef<any>(null); // eslint-disable-line @typescript-eslint/no-explicit-any
+  // IMPORTANT: use the exact generics react-force-graph-2d expects
+  const graphRef = useRef<ForceGraphMethods<RFNode, RFLink> | undefined>(
+    undefined
+  );
   const containerRef = useRef<HTMLDivElement | null>(null);
+
   const [dimensions, setDimensions] = useState({ width: 800, height: 600 });
   const [hoveredNode, setHoveredNode] = useState<string | null>(null);
   const imageCache = useRef<Map<string, HTMLImageElement>>(new Map()).current;
   const [, forceUpdate] = useState({});
   const [isHoveringAnyNode, setIsHoveringAnyNode] = useState(false);
+
+  // --- Kinetic pan state (inertia) ---
+  const kineticRef = useRef<{
+    raf: number | null;
+    active: boolean;
+    vx: number;
+    vy: number;
+    lastPts: Array<{ x: number; y: number; t: number }>;
+  }>({ raf: null, active: false, vx: 0, vy: 0, lastPts: [] });
+
+  const stopKinetic = () => {
+    const k = kineticRef.current;
+    if (k.raf) cancelAnimationFrame(k.raf);
+    k.raf = null;
+    k.active = false;
+    k.vx = 0;
+    k.vy = 0;
+    k.lastPts = [];
+  };
 
   useEffect(() => {
     const handleResize = () =>
@@ -89,14 +135,13 @@ export default function MusicGraph({
   useEffect(() => {
     if (!centerNodeName || !graphRef.current) return;
     const t = setTimeout(() => {
-      const fg = graphRef.current;
+      const fg = graphRef.current!;
       const node = data.nodes.find((n) => n.name === centerNodeName) as
         | ForceGraphNode
         | undefined;
       if (!node) return;
 
       const centerAndZoom = (n: ForceGraphNode) => {
-        if (!fg) return;
         fg.centerAt((n.x as number) ?? 0, (n.y as number) ?? 0, 1000);
         fg.zoom(2, 1000);
       };
@@ -114,6 +159,129 @@ export default function MusicGraph({
     }, 150);
     return () => clearTimeout(t);
   }, [centerNodeName, data.nodes]);
+
+  // --- Kinetic pan listeners & fling loop ---
+  useEffect(() => {
+    const fg = graphRef.current;
+    if (!fg) return;
+
+    // The 2D instance exposes .canvas(), but it isn't typed in defs
+    const canvas = (
+      fg as unknown as { canvas?: () => HTMLCanvasElement | null }
+    ).canvas?.();
+    const el: HTMLElement | null = canvas || containerRef.current;
+    if (!el) return;
+
+    const k = kineticRef.current;
+
+    const onPointerDown: EventListener = () => {
+      stopKinetic();
+      k.lastPts = [];
+    };
+
+    const onPointerMove: EventListener = (ev: Event) => {
+      let x = 0;
+      let y = 0;
+      const now = performance.now();
+
+      if ('touches' in ev && (ev as TouchEvent).touches.length) {
+        const t = (ev as TouchEvent).touches[0];
+        x = t.clientX;
+        y = t.clientY;
+      } else if ('clientX' in (ev as PointerEvent)) {
+        const p = ev as PointerEvent;
+        x = p.clientX;
+        y = p.clientY;
+      }
+
+      k.lastPts.push({ x, y, t: now });
+      const cutoff = now - 120;
+      while (k.lastPts.length && k.lastPts[0].t < cutoff) k.lastPts.shift();
+    };
+
+    const onPointerUp: EventListener = () => {
+      if (k.lastPts.length < 2 || !graphRef.current) return;
+
+      const a = k.lastPts[0];
+      const b = k.lastPts[k.lastPts.length - 1];
+      const dt = Math.max(1, b.t - a.t);
+      const vxPx = (b.x - a.x) / dt; // px/ms
+      const vyPx = (b.y - a.y) / dt; // px/ms
+
+      const speed = Math.hypot(vxPx, vyPx);
+      if (speed < 0.05) {
+        k.lastPts = [];
+        return;
+      }
+
+      const screenCenterX = dimensions.width / 2;
+      const screenCenterY = dimensions.height / 2;
+
+      const centerA = fg.screen2GraphCoords(screenCenterX, screenCenterY);
+      const centerAXp = fg.screen2GraphCoords(
+        screenCenterX + 1,
+        screenCenterY + 1
+      );
+
+      const pxToGraphX = centerAXp.x - centerA.x;
+      const pxToGraphY = centerAXp.y - centerA.y;
+
+      k.vx = -vxPx * pxToGraphX; // world moves opposite the drag
+      k.vy = -vyPx * pxToGraphY;
+      k.active = true;
+
+      let cx = centerA.x;
+      let cy = centerA.y;
+      let lastTime = performance.now();
+
+      const friction = 0.94; // lower => longer glide
+      const stopSpeed = 0.0005;
+
+      const tick = () => {
+        if (!k.active) return;
+
+        const now = performance.now();
+        const dms = now - lastTime;
+        lastTime = now;
+
+        cx += k.vx * dms;
+        cy += k.vy * dms;
+
+        fg.centerAt(cx, cy, 0);
+
+        k.vx *= friction;
+        k.vy *= friction;
+
+        if (Math.hypot(k.vx, k.vy) < stopSpeed) {
+          stopKinetic();
+          return;
+        }
+        k.raf = requestAnimationFrame(tick);
+      };
+
+      k.raf = requestAnimationFrame(tick);
+      k.lastPts = [];
+    };
+
+    el.addEventListener('pointerdown', onPointerDown, { passive: true });
+    el.addEventListener('pointermove', onPointerMove, { passive: true });
+    el.addEventListener('pointerup', onPointerUp, { passive: true });
+    el.addEventListener('touchstart', onPointerDown, { passive: true });
+    el.addEventListener('touchmove', onPointerMove, { passive: true });
+    el.addEventListener('touchend', onPointerUp, { passive: true });
+    window.addEventListener('blur', stopKinetic);
+
+    return () => {
+      el.removeEventListener('pointerdown', onPointerDown);
+      el.removeEventListener('pointermove', onPointerMove);
+      el.removeEventListener('pointerup', onPointerUp);
+      el.removeEventListener('touchstart', onPointerDown);
+      el.removeEventListener('touchmove', onPointerMove);
+      el.removeEventListener('touchend', onPointerUp);
+      window.removeEventListener('blur', stopKinetic);
+      stopKinetic();
+    };
+  }, [dimensions.width, dimensions.height]);
 
   const getNodeColor = useCallback((node: GraphNode) => {
     const genre = node.group?.toLowerCase() || 'unknown';
@@ -140,10 +308,10 @@ export default function MusicGraph({
 
       if (isHovered || isSelected || node.depth === 0) {
         ctx.shadowColor = nodeColor;
-        ctx.shadowBlur = isSelected ? 30 : isHovered ? 20 : 15;
-        ctx.fillStyle = nodeColor + '44';
+        ctx.shadowBlur = isSelected ? 12 : isHovered ? 6 : 4; // softer shadow
+        ctx.fillStyle = nodeColor + '22'; // dimmer halo (alpha ↓)
         ctx.beginPath();
-        ctx.arc(x, y, nodeSize * 1.5, 0, 2 * Math.PI);
+        ctx.arc(x, y, nodeSize * 1.2, 0, 2 * Math.PI); // smaller halo radius
         ctx.fill();
         ctx.shadowBlur = 0;
       }
@@ -189,17 +357,22 @@ export default function MusicGraph({
         }
       }
 
-      if (isHovered || isSelected) {
-        ctx.strokeStyle = '#fff';
-        ctx.lineWidth = isSelected ? 3 : 2;
-        ctx.stroke();
-      }
+      // Ring uses node color; on hover we brighten it; on select we keep a thicker white ring
+      const ringColor = isSelected
+        ? '#fff'
+        : isHovered
+        ? lightenHex(nodeColor, 0.45)
+        : nodeColor;
+      ctx.strokeStyle = ringColor;
+      ctx.lineWidth = isSelected ? 3 : 2;
+      ctx.beginPath();
+      ctx.arc(x, y, nodeSize, 0, 2 * Math.PI);
+      ctx.stroke();
 
       ctx.font = `${fontSize}px Inter, system-ui, sans-serif`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
 
-      // keep the always-visible label under the node (not a tooltip)
       if (node.depth === 0 || globalScale > 1) {
         const textY = y + nodeSize + fontSize;
         ctx.fillStyle = '#fff';
@@ -210,7 +383,7 @@ export default function MusicGraph({
   );
 
   const linkCanvasObject = useCallback(
-    (link: ForceGraphLink, ctx: CanvasRenderingContext2D) => {
+    (link: RFLink, ctx: CanvasRenderingContext2D) => {
       const start = link.source as ForceGraphNode;
       const end = link.target as ForceGraphNode;
       if (!start || !end) return;
@@ -233,8 +406,8 @@ export default function MusicGraph({
       gradient.addColorStop(1, '#4f46e533');
 
       ctx.strokeStyle = gradient;
-      ctx.lineWidth = Math.max(0.5, (link.value ?? 1) * 2);
-      ctx.globalAlpha = 0.3 + (link.value ?? 1) * 0.4;
+      ctx.lineWidth = Math.max(0.5, ((link.value as number) ?? 1) * 2);
+      ctx.globalAlpha = 0.3 + ((link.value as number) ?? 1) * 0.4;
       ctx.beginPath();
       ctx.moveTo(startX, startY);
       ctx.lineTo(endX, endY);
@@ -275,13 +448,21 @@ export default function MusicGraph({
 
       <ForceGraph2D
         ref={graphRef}
-        graphData={data}
+        graphData={data as unknown as { nodes: RFNode[]; links: RFLink[] }}
         width={dimensions.width}
         height={dimensions.height}
-        nodeCanvasObject={nodeCanvasObject}
+        nodeCanvasObject={
+          nodeCanvasObject as unknown as (
+            node: RFNode,
+            ctx: CanvasRenderingContext2D,
+            globalScale: number
+          ) => void
+        }
         linkCanvasObject={linkCanvasObject}
-        onNodeClick={handleNodeClick}
-        onNodeHover={handleNodeHover}
+        onNodeClick={handleNodeClick as unknown as (node: RFNode) => void}
+        onNodeHover={
+          handleNodeHover as unknown as (node?: RFNode | null) => void
+        }
         backgroundColor="transparent"
         nodeRelSize={1}
         nodeId="id"
@@ -289,13 +470,14 @@ export default function MusicGraph({
         linkSource="source"
         linkTarget="target"
         nodePointerAreaPaint={(
-          node: ForceGraphNode,
+          node: RFNode,
           color: string,
           ctx: CanvasRenderingContext2D
         ) => {
-          const x = node.x ?? 0;
-          const y = node.y ?? 0;
-          const nodeSize = node.size || 10;
+          const n = node as unknown as ForceGraphNode;
+          const x = n.x ?? 0;
+          const y = n.y ?? 0;
+          const nodeSize = n.size || 10;
           ctx.fillStyle = color;
           ctx.beginPath();
           ctx.arc(x, y, nodeSize * 1.2, 0, 2 * Math.PI);
@@ -308,8 +490,7 @@ export default function MusicGraph({
         maxZoom={5}
         cooldownTicks={100}
         onEngineStop={() => graphRef.current?.zoomToFit(400, 50)}
-        /** Turn OFF the built-in hover tooltip completely */
-        nodeLabel={() => ''}
+        nodeLabel={() => ''} // disable built-in tooltip
       />
     </div>
   );
