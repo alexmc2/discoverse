@@ -1,7 +1,6 @@
-// components/MusicMapApp.tsx
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import dynamic from 'next/dynamic';
 import { AnimatePresence } from 'framer-motion';
 import ArtistPanel from '@/components/artist-panel';
@@ -24,6 +23,7 @@ const STORAGE_KEYS = {
   GRAPH_DATA: 'musicMap_graphData',
   HAS_SEARCHED: 'musicMap_hasSearched',
   SELECTED_ARTIST: 'musicMap_selectedArtist',
+  MODE: 'musicMap_mode',
 };
 
 export default function MusicMapApp() {
@@ -36,6 +36,11 @@ export default function MusicMapApp() {
   const [error, setError] = useState<string | null>(null);
   const [hasSearched, setHasSearched] = useState(false);
   const [isHydrated, setIsHydrated] = useState(false);
+  const [mode, setMode] = useState<'map' | 'info'>('info');
+  const [centerNodeName, setCenterNodeName] = useState<string | null>(null);
+
+  // Simple in-memory cache for expansions
+  const expansionCache = useRef<Map<string, GraphData>>(new Map());
 
   useEffect(() => {
     const storedGraphData = localStorage.getItem(STORAGE_KEYS.GRAPH_DATA);
@@ -43,6 +48,10 @@ export default function MusicMapApp() {
     const storedSelectedArtist = localStorage.getItem(
       STORAGE_KEYS.SELECTED_ARTIST
     );
+    const storedMode = localStorage.getItem(STORAGE_KEYS.MODE) as
+      | 'map'
+      | 'info'
+      | null;
 
     if (storedGraphData) {
       try {
@@ -56,6 +65,7 @@ export default function MusicMapApp() {
     if (storedHasSearched === 'true') setHasSearched(true);
     if (storedSelectedArtist && storedSelectedArtist !== 'null')
       setSelectedArtist(storedSelectedArtist);
+    if (storedMode === 'map' || storedMode === 'info') setMode(storedMode);
     setIsHydrated(true);
   }, []);
 
@@ -77,6 +87,42 @@ export default function MusicMapApp() {
       );
   }, [selectedArtist, isHydrated]);
 
+  useEffect(() => {
+    if (isHydrated) localStorage.setItem(STORAGE_KEYS.MODE, mode);
+  }, [mode, isHydrated]);
+
+  const mergeGraphData = useCallback(
+    (base: GraphData, incoming: GraphData): GraphData => {
+      const nodeById = new Map(base.nodes.map((n) => [n.id, n] as const));
+      const nodes: GraphNode[] = [...base.nodes];
+
+      for (const n of incoming.nodes) {
+        if (!nodeById.has(n.id)) {
+          nodeById.set(n.id, n);
+          nodes.push(n);
+        }
+      }
+
+      const linkKey = (l: GraphLink) =>
+        `${typeof l.source === 'string' ? l.source : l.source}-${
+          typeof l.target === 'string' ? l.target : l.target
+        }`;
+      const existingLinks = new Set(base.links.map(linkKey));
+      const links: GraphLink[] = [...base.links];
+
+      for (const l of incoming.links) {
+        const k = linkKey(l);
+        if (!existingLinks.has(k)) {
+          existingLinks.add(k);
+          links.push(l);
+        }
+      }
+
+      return { nodes, links };
+    },
+    []
+  );
+
   const handleSearch = useCallback(async (artistName: string) => {
     setLoading(true);
     setError(null);
@@ -93,6 +139,8 @@ export default function MusicMapApp() {
       } else {
         setGraphData(data);
         setSelectedArtist(null);
+        setCenterNodeName(artistName); // ensure center on initial search
+        expansionCache.current.set(artistName.toLowerCase(), data);
       }
     } catch (err) {
       console.error('Search error:', err);
@@ -105,16 +153,57 @@ export default function MusicMapApp() {
     }
   }, []);
 
-  const handleNodeClick = useCallback((node: GraphNode) => {
-    setSelectedArtist(node.name);
-  }, []);
+  const expandFromArtist = useCallback(
+    async (artistName: string) => {
+      const key = artistName.toLowerCase();
+      let data = expansionCache.current.get(key);
 
-  const handleExpand = useCallback(
+      setLoading(true);
+      setError(null);
+      setHasSearched(true);
+
+      try {
+        if (!data) {
+          data = await buildGraphData(artistName);
+          if (data.nodes.length === 0) {
+            setLoading(false);
+            return;
+          }
+          expansionCache.current.set(key, data);
+        }
+
+        setGraphData((prev) => mergeGraphData(prev, data!));
+        setSelectedArtist(null);
+        setCenterNodeName(artistName); // request re-center on the new artist
+      } catch (err) {
+        console.error('Expand error:', err);
+        setError('Failed to expand from artist.');
+      } finally {
+        setLoading(false);
+      }
+    },
+    [mergeGraphData]
+  );
+
+  const handleNodeClick = useCallback(
+    (node: GraphNode) => {
+      if (mode === 'map') {
+        // In Map mode, clicking expands/merges and recenters
+        expandFromArtist(node.name);
+      } else {
+        // Info mode: open the side panel (existing behavior)
+        setSelectedArtist(node.name);
+      }
+    },
+    [mode, expandFromArtist]
+  );
+
+  const handleExpandFromPanel = useCallback(
     (artistName: string) => {
       setSelectedArtist(null);
-      handleSearch(artistName);
+      expandFromArtist(artistName);
     },
-    [handleSearch]
+    [expandFromArtist]
   );
 
   const handleClearData = useCallback(() => {
@@ -122,6 +211,7 @@ export default function MusicMapApp() {
     setHasSearched(false);
     setSelectedArtist(null);
     setError(null);
+    setCenterNodeName(null);
     localStorage.removeItem(STORAGE_KEYS.GRAPH_DATA);
     localStorage.removeItem(STORAGE_KEYS.HAS_SEARCHED);
     localStorage.removeItem(STORAGE_KEYS.SELECTED_ARTIST);
@@ -142,6 +232,8 @@ export default function MusicMapApp() {
           hasData={graphData.nodes.length > 0}
           onClearData={handleClearData}
           error={error}
+          mode={mode}
+          onModeChange={setMode}
         />
       )}
 
@@ -161,6 +253,7 @@ export default function MusicMapApp() {
                   data={graphData}
                   onNodeClick={handleNodeClick}
                   selectedNode={selectedArtist}
+                  centerNodeName={centerNodeName}
                 />
               </div>
             )}
@@ -171,7 +264,7 @@ export default function MusicMapApp() {
       <ArtistPanel
         artistName={selectedArtist}
         onClose={() => setSelectedArtist(null)}
-        onExpand={handleExpand}
+        onExpand={handleExpandFromPanel}
       />
     </div>
   );

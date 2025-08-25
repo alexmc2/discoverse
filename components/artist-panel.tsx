@@ -168,7 +168,7 @@ export default function ArtistPanel({
                     <h4 className="text-sm font-medium text-gray-400 mb-2">
                       About
                     </h4>
-                    <p className="text-gray-300 text-sm leading-relaxed line-clamp-6">
+                    <p className="text-gray-300 text-sm leading-relaxed ">
                       {artist.bio}
                     </p>
                   </div>

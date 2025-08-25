@@ -1,11 +1,9 @@
-// components/MusicGraph.tsx
 'use client';
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 import ForceGraph2D from 'react-force-graph-2d';
 import { GraphNode, GraphLink } from '@/lib/lastfm';
 
-// Extended interfaces for force-graph library objects
 interface ForceGraphNode extends GraphNode {
   x?: number;
   y?: number;
@@ -21,13 +19,11 @@ interface ForceGraphLink extends Omit<GraphLink, 'source' | 'target'> {
 }
 
 interface MusicGraphProps {
-  data: {
-    nodes: GraphNode[];
-    links: GraphLink[];
-  };
+  data: { nodes: GraphNode[]; links: GraphLink[] };
   onNodeClick?: (node: GraphNode) => void;
   onNodeHover?: (node: GraphNode | null) => void;
   selectedNode?: string | null;
+  centerNodeName?: string | null; // NEW: explicit center request
 }
 
 const genreColors: Record<string, string> = {
@@ -51,21 +47,19 @@ export default function MusicGraph({
   onNodeClick,
   onNodeHover,
   selectedNode,
+  centerNodeName,
 }: MusicGraphProps) {
   const graphRef = useRef<any>(null); // eslint-disable-line @typescript-eslint/no-explicit-any
+  const containerRef = useRef<HTMLDivElement | null>(null);
   const [dimensions, setDimensions] = useState({ width: 800, height: 600 });
   const [hoveredNode, setHoveredNode] = useState<string | null>(null);
   const imageCache = useRef<Map<string, HTMLImageElement>>(new Map()).current;
   const [, forceUpdate] = useState({});
+  const [isHoveringAnyNode, setIsHoveringAnyNode] = useState(false);
 
   useEffect(() => {
-    const handleResize = () => {
-      setDimensions({
-        width: window.innerWidth,
-        height: window.innerHeight,
-      });
-    };
-
+    const handleResize = () =>
+      setDimensions({ width: window.innerWidth, height: window.innerHeight });
     handleResize();
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
@@ -78,20 +72,42 @@ export default function MusicGraph({
         .d3Force('link')
         .distance((link: any) => 50 / (link.value || 1)); // eslint-disable-line @typescript-eslint/no-explicit-any
       graphRef.current.d3Force('center').strength(0.05);
-
-      setTimeout(() => {
-        graphRef.current?.zoomToFit(400, 50);
-      }, 500);
+      setTimeout(() => graphRef.current?.zoomToFit(400, 50), 500);
     }
   }, [data]);
 
+  // Smoothly center on a specific node when requested
+  useEffect(() => {
+    if (!centerNodeName || !graphRef.current) return;
+    const t = setTimeout(() => {
+      const fg = graphRef.current;
+      const node = data.nodes.find((n) => n.name === centerNodeName) as
+        | ForceGraphNode
+        | undefined;
+      if (!node) return;
+      if (node.x == null || node.y == null) {
+        setTimeout(() => {
+          const retry = data.nodes.find((n) => n.name === centerNodeName) as
+            | ForceGraphNode
+            | undefined;
+          if (retry && retry.x != null && retry.y != null) {
+            fg.centerAt(retry.x as number, retry.y as number, 1000);
+            fg.zoom(2, 1000);
+          }
+        }, 300);
+        return;
+      }
+      fg.centerAt(node.x as number, node.y as number, 1000);
+      fg.zoom(2, 1000);
+    }, 150);
+    return () => clearTimeout(t);
+  }, [centerNodeName, data.nodes]);
+
   const getNodeColor = useCallback((node: GraphNode) => {
     const genre = node.group?.toLowerCase() || 'unknown';
-
     for (const [key, color] of Object.entries(genreColors)) {
       if (genre.includes(key)) return color;
     }
-
     return genreColors.unknown;
   }, []);
 
@@ -131,7 +147,6 @@ export default function MusicGraph({
         (isHovered || node.depth === 0 || globalScale > 1.5)
       ) {
         let img = imageCache.get(node.id);
-
         if (!img) {
           img = new Image();
           img.crossOrigin = 'anonymous';
@@ -141,7 +156,6 @@ export default function MusicGraph({
             forceUpdate({});
           };
         }
-
         if (img.complete && img.naturalWidth > 0) {
           ctx.save();
           ctx.beginPath();
@@ -155,7 +169,6 @@ export default function MusicGraph({
             nodeSize * 2
           );
           ctx.restore();
-
           ctx.strokeStyle = nodeColor;
           ctx.lineWidth = 2;
           ctx.beginPath();
@@ -175,17 +188,9 @@ export default function MusicGraph({
       ctx.textBaseline = 'middle';
 
       if (isHovered || node.depth === 0 || globalScale > 1) {
-        const textWidth = ctx.measureText(label).width;
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-        ctx.fillRect(
-          x - textWidth / 2 - 2,
-          y + nodeSize + 3,
-          textWidth + 4,
-          fontSize + 4
-        );
-
+        const textY = y + nodeSize + fontSize;
         ctx.fillStyle = '#fff';
-        ctx.fillText(label, x, y + nodeSize + fontSize);
+        ctx.fillText(label, x, textY);
       }
     },
     [hoveredNode, selectedNode, getNodeColor, imageCache, forceUpdate]
@@ -195,14 +200,12 @@ export default function MusicGraph({
     (link: ForceGraphLink, ctx: CanvasRenderingContext2D) => {
       const start = link.source as ForceGraphNode;
       const end = link.target as ForceGraphNode;
-
       if (!start || !end) return;
 
       const startX = start.x ?? 0;
       const startY = start.y ?? 0;
       const endX = end.x ?? 0;
       const endY = end.y ?? 0;
-
       if (
         !Number.isFinite(startX) ||
         !Number.isFinite(startY) ||
@@ -211,21 +214,18 @@ export default function MusicGraph({
       )
         return;
 
-      // Gradient: sky-600 → blue-600 → indigo-600
       const gradient = ctx.createLinearGradient(startX, startY, endX, endY);
-      gradient.addColorStop(0, '#0284c733'); // sky-600 @ 20%
-      gradient.addColorStop(0.5, '#2563eb33'); // blue-600 @ 20%
-      gradient.addColorStop(1, '#4f46e533'); // indigo-600 @ 20%
+      gradient.addColorStop(0, '#0284c733');
+      gradient.addColorStop(0.5, '#2563eb33');
+      gradient.addColorStop(1, '#4f46e533');
 
       ctx.strokeStyle = gradient;
       ctx.lineWidth = Math.max(0.5, link.value * 2);
       ctx.globalAlpha = 0.3 + link.value * 0.4;
-
       ctx.beginPath();
       ctx.moveTo(startX, startY);
       ctx.lineTo(endX, endY);
       ctx.stroke();
-
       ctx.globalAlpha = 1;
     },
     []
@@ -233,9 +233,7 @@ export default function MusicGraph({
 
   const handleNodeClick = useCallback(
     (node: ForceGraphNode) => {
-      if (onNodeClick) {
-        onNodeClick(node as GraphNode);
-      }
+      onNodeClick?.(node as GraphNode);
     },
     [onNodeClick]
   );
@@ -243,15 +241,18 @@ export default function MusicGraph({
   const handleNodeHover = useCallback(
     (node: ForceGraphNode | null) => {
       setHoveredNode(node?.id || null);
-      if (onNodeHover) {
-        onNodeHover(node as GraphNode | null);
-      }
+      setIsHoveringAnyNode(!!node);
+      onNodeHover?.(node as GraphNode | null);
     },
     [onNodeHover]
   );
 
   return (
-    <div className="relative w-full h-full bg-gradient-to-br from-sky-950/10 via-blue-900/10 to-indigo-950/10">
+    <div
+      ref={containerRef}
+      className="relative w-full h-full bg-gradient-to-br from-sky-950/10 via-blue-900/10 to-indigo-950/10"
+      style={{ cursor: isHoveringAnyNode ? 'pointer' : 'default' }}
+    >
       <div
         className="absolute inset-0 opacity-20"
         style={{

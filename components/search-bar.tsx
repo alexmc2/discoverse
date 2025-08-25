@@ -103,7 +103,7 @@ export default function SearchBar({ onSearch, isLoading }: SearchBarProps) {
   };
 
   return (
-    <div ref={searchRef} className="relative w-full max-w-2xl">
+    <div ref={searchRef} className="relative w-full max-w-96 ">
       <form onSubmit={handleSubmit} className="relative">
         <div className="relative flex items-center">
           <Input
