@@ -85,7 +85,7 @@ export default function ArtistPanel({
                 <h2 className="text-xl font-bold text-white">Artist Details</h2>
                 <button
                   onClick={onClose}
-                  className="p-2 rounded-lg transition-colors hover:bg-gradient-to-r hover:from-sky-900/30 hover:via-blue-900/30 hover:to-indigo-900/30"
+                  className="cursor-pointer p-2 rounded-lg transition-colors hover:bg-gradient-to-r hover:from-sky-900/30 hover:via-blue-900/30 hover:to-indigo-900/30"
                 >
                   <X className="w-5 h-5 text-gray-400" />
                 </button>
@@ -179,7 +179,7 @@ export default function ArtistPanel({
                   {onExpand && (
                     <button
                       onClick={() => onExpand(artist.name)}
-                      className="w-full px-4 py-3 bg-gradient-to-r from-sky-600 via-blue-600 to-indigo-600 text-white rounded-lg font-medium transition-all duration-300 hover:brightness-110 flex items-center justify-center gap-2"
+                      className="cursor-pointer w-full px-4 py-3 bg-gradient-to-r from-sky-600 via-blue-600 to-indigo-600 text-white rounded-lg font-medium transition-all duration-300 hover:brightness-110 flex items-center justify-center gap-2"
                     >
                       <Maximize2 className="w-4 h-4" />
                       Explore from this artist
@@ -190,7 +190,7 @@ export default function ArtistPanel({
                     href={artist.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="w-full px-4 py-3 bg-gray-800 text-white rounded-lg font-medium hover:bg-gradient-to-r hover:from-sky-900/30 hover:via-blue-900/30 hover:to-indigo-900/30 transition-colors flex items-center justify-center gap-2"
+                    className="cursor-pointer w-full px-4 py-3 bg-gray-800 text-white rounded-lg font-medium hover:bg-gradient-to-r hover:from-sky-900/30 hover:via-blue-900/30 hover:to-indigo-900/30 transition-colors flex items-center justify-center gap-2"
                   >
                     <ExternalLink className="w-4 h-4" />
                     View on Last.fm

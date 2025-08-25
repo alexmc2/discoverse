@@ -50,14 +50,14 @@
 // }
 'use client';
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Player } from '@lottiefiles/react-lottie-player';
 
 type DefaultContentProps = {
   onSearch: (artistName: string) => void;
 };
 
-const SUGGESTED_ARTISTS = [
+const FALLBACK_ARTISTS = [
   'The Beatles',
   'Radiohead',
   'Kendrick Lamar',
@@ -66,6 +66,30 @@ const SUGGESTED_ARTISTS = [
 ] as const;
 
 export default function DefaultContent({ onSearch }: DefaultContentProps) {
+  const [suggestedArtists, setSuggestedArtists] = useState<string[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchRandomArtists = async () => {
+      try {
+        const response = await fetch('/api/random-artists');
+        if (response.ok) {
+          const data = await response.json();
+          setSuggestedArtists(data.artists);
+        } else {
+          setSuggestedArtists([...FALLBACK_ARTISTS]);
+        }
+      } catch (error) {
+        console.error('Failed to fetch random artists:', error);
+        setSuggestedArtists([...FALLBACK_ARTISTS]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchRandomArtists();
+  }, []);
+
   return (
     <div className="flex items-center justify-center h-full">
       {/* keep your original offsets so the text doesn't move */}
@@ -95,16 +119,29 @@ export default function DefaultContent({ onSearch }: DefaultContentProps) {
           interactive constellation.
         </p>
 
-        <div className="flex flex-wrap gap-2 justify-center">
-          {SUGGESTED_ARTISTS.map((artist) => (
-            <button
-              key={artist}
-              onClick={() => onSearch(artist)}
-              className="px-4 py-2 bg-gray-800/50 text-gray-300 rounded-full text-sm transition-all duration-300 border border-gray-700 hover:text-white hover:bg-gradient-to-r hover:from-sky-900/30 hover:via-blue-900/30 hover:to-indigo-900/30"
-            >
-              {artist}
-            </button>
-          ))}
+        <div className="flex flex-wrap gap-2 justify-center min-h-[44px]">
+          {isLoading ? (
+            <div className="flex gap-2">
+              {[...Array(5)].map((_, i) => (
+                <div
+                  key={i}
+                  className="h-9 w-24 bg-gray-800/50 rounded-full animate-pulse border border-gray-700"
+                />
+              ))}
+            </div>
+          ) : (
+            suggestedArtists.map((artist) => (
+              <button
+                key={artist}
+                onClick={() => onSearch(artist)}
+                className="px-4 py-2 bg-gray-800/50 text-gray-300 rounded-full text-sm transition-all duration-300 border border-gray-700 hover:text-white hover:bg-gradient-to-r hover:from-sky-900/30 hover:via-blue-900/30 hover:to-indigo-900/30 cursor-pointer"
+                tabIndex={0}
+                aria-label={`Search for ${artist}`}
+              >
+                {artist}
+              </button>
+            ))
+          )}
         </div>
       </div>
     </div>
