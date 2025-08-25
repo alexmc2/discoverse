@@ -37,7 +37,7 @@ export default function DefaultContent({ onSearch }: DefaultContentProps) {
   return (
     <div className="flex items-center justify-center h-full">
       {/* keep your original offsets so the text doesn't move */}
-      <div className="text-center sm:px-6 px-4 -mt-12 sm:-mt-20 md:-mt-64">
+      <div className="text-center sm:px-6 px-4 -mt-20 sm:-mt-20 md:-mt-64">
         {/* original icon slot size (doesn't change layout height) */}
         <div className="relative mx-auto h-32 w-32 sm:h-40 sm:w-40">
           {/* single Lottie, absolutely centered; scales up to 400px */}

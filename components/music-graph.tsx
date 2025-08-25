@@ -31,21 +31,24 @@ interface MusicGraphProps {
   centerNodeName?: string | null;
 }
 
+// Tailwind v3 500-scale colors
+// High-contrast Tailwind mapping (varied weights to avoid lookalikes)
 const genreColors: Record<string, string> = {
-  rock: '#FF6B6B',
-  pop: '#4ECDC4',
-  electronic: '#45B7D1',
-  'hip hop': '#FFA07A',
-  jazz: '#98D8C8',
-  classical: '#F7DC6F',
-  metal: '#BB8FCE',
-  indie: '#85C1E2',
-  folk: '#F8B739',
-  blues: '#5DADE2',
-  country: '#F1948A',
-  alternative: '#58D68D',
-  unknown: '#95A5A6',
+  rock: '#ef4444',       // red-500
+  pop: '#f59e0b',        // amber-500
+  electronic: '#84cc16', // lime-500
+  'hip hop': '#16a34a',  // green-600 (darker than lime)
+  jazz: '#2dd4bf',       // teal-400 (pulled left of cyan for separation)
+  classical: '#0284c7',  // sky-600 (darker than teal/cyan family)
+  metal: '#3b82f6',      // blue-500
+  indie: '#4f46e5',      // indigo-600 (deeper than blue)
+  folk: '#7c3aed',       // violet-600
+  blues: '#c084fc',      // purple-400 (lighter than violet so they don’t merge)
+  country: '#e879f9',    // fuchsia-400
+  alternative: '#f43f5e',// rose-500
+  unknown: '#71717a',    // zinc-500
 };
+
 
 // Lighten a hex color toward white by `strength` (0..1)
 const lightenHex = (hex: string, strength = 0.45): string => {
@@ -60,7 +63,6 @@ const lightenHex = (hex: string, strength = 0.45): string => {
   const toHex = (v: number) => v.toString(16).padStart(2, '0');
   return `#${toHex(lr)}${toHex(lg)}${toHex(lb)}`;
 };
-
 
 type RFNode = NodeObject<ForceGraphNode>;
 type RFLink = LinkObject<ForceGraphNode, ForceGraphLink>;
@@ -373,8 +375,12 @@ export default function MusicGraph({
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
 
-      if (node.depth === 0 || globalScale > 1) {
+      {
         const textY = y + nodeSize + fontSize;
+        const strokeW = Math.max(1.5 / globalScale, 0.5); // zoom-invariant outline
+        ctx.lineWidth = strokeW;
+        ctx.strokeStyle = 'rgba(0,0,0,0.45)';
+        ctx.strokeText(label, x, textY);
         ctx.fillStyle = '#fff';
         ctx.fillText(label, x, textY);
       }

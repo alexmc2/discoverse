@@ -36,7 +36,7 @@ export default function Header({
           {hasSearched && hasData && (
             <button
               onClick={onClearData}
-              className="cursor-pointer ml-auto px-4 py-2 bg-gray-800 text-gray-300 rounded-lg text-sm transition-all duration-300 border border-gray-700 hover:text-white hover:bg-gradient-to-r hover:from-sky-900/30 hover:via-blue-900/30 hover:to-indigo-900/30"
+              className="cursor-pointer ml-auto px-4 py-2 bg-gray-800 text-gray-200 rounded-lg text-sm transition-all duration-300 border border-gray-700 hover:text-white hover:bg-gradient-to-r hover:from-sky-900/30 hover:via-blue-900/30 hover:to-indigo-900/30"
             >
               <span className="sm:hidden">Clear</span>
               <span className="hidden sm:inline">Clear Graph</span>

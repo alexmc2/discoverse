@@ -62,6 +62,7 @@ export default function ArtistPanel({
     fetchArtistInfo();
   }, [artistName]);
 
+
   const formatNumber = (num: number) => {
     if (num >= 1000000) return `${(num / 1000000).toFixed(1)}M`;
     if (num >= 1000) return `${(num / 1000).toFixed(1)}K`;
@@ -71,13 +72,24 @@ export default function ArtistPanel({
   return (
     <AnimatePresence>
       {artistName && (
-        <motion.div
-          initial={{ x: '100%' }}
-          animate={{ x: 0 }}
-          exit={{ x: '100%' }}
-          transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-          className="fixed right-0 top-0 h-full w-96 bg-gray-900/95 backdrop-blur-xl border-l border-gray-800 shadow-2xl z-40 overflow-y-auto"
-        >
+        <>
+          {/* Backdrop overlay to capture clicks outside */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="fixed inset-0 z-30"
+            onClick={onClose}
+            aria-hidden="true"
+          />
+          <motion.div
+            initial={{ x: '100%' }}
+            animate={{ x: 0 }}
+            exit={{ x: '100%' }}
+            transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+            className="fixed right-0 top-0 h-full w-96 bg-gray-900/95 backdrop-blur-xl border-l border-gray-800 shadow-2xl z-40 overflow-y-auto"
+          >
           <div className="relative">
             {/* Header */}
             <div className="sticky top-0 bg-gray-900/95 backdrop-blur-xl border-b border-gray-800 p-4 z-10">
@@ -182,7 +194,7 @@ export default function ArtistPanel({
                       className="cursor-pointer w-full px-4 py-3 bg-gradient-to-r from-sky-600 via-blue-600 to-indigo-600 text-white rounded-lg font-medium transition-all duration-300 hover:brightness-110 flex items-center justify-center gap-2"
                     >
                       <Maximize2 className="w-4 h-4" />
-                      Explore from this artist
+                      Map Connections
                     </button>
                   )}
 
@@ -200,6 +212,7 @@ export default function ArtistPanel({
             ) : null}
           </div>
         </motion.div>
+        </>
       )}
     </AnimatePresence>
   );

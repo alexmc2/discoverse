@@ -56,7 +56,7 @@ export default function ModeToggle({
                 onClick={() => onModeChange('map')}
                 className={`px-3 py-1.5 text-sm transition-colors border-l border-gray-800 cursor-pointer ${
                   mode === 'map'
-                    ? 'text-white bg-gray-900'
+                    ? 'text-white bg-gray-800'
                     : 'text-gray-400 hover:text-white hover:bg-gray-800/50'
                 }`}
               >
