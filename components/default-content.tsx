@@ -1,57 +1,16 @@
-// 'use client';
-
-// import { Music2 } from 'lucide-react';
-
-// interface DefaultContentProps {
-//   onSearch: (artistName: string) => void;
-// }
-
-// export default function DefaultContent({ onSearch }: DefaultContentProps) {
-//   const suggestedArtists = [
-//     'The Beatles',
-//     'Radiohead',
-//     'Kendrick Lamar',
-//     'Taylor Swift',
-//     'Pink Floyd',
-//   ];
-
-//   return (
-//     <div className="flex items-center justify-center h-full -mt-[90px]">
-//       <div className="text-center px-6">
-//         <div className="w-32 h-32 mx-auto mb-8 relative">
-//           <div className="absolute inset-0 rounded-full blur-2xl opacity-50 animate-pulse-glow bg-gradient-to-r from-sky-600 via-blue-600 to-indigo-600" />
-//           <div className="relative w-full h-full rounded-full flex items-center justify-center bg-gradient-to-r from-sky-600 via-blue-600 to-indigo-600">
-//             <Music2 className="w-16 h-16 text-white" />
-//           </div>
-//         </div>
-
-//         <h2 className="text-3xl font-bold text-white mb-4">
-//           Discover Musical Connections
-//         </h2>
-//         <p className="text-gray-400 max-w-md mx-auto mb-8">
-//           See how artists connect through genres and influences in an
-//           interactive constellation.
-//         </p>
-
-//         <div className="flex flex-wrap gap-2 justify-center">
-//           {suggestedArtists.map((artist) => (
-//             <button
-//               key={artist}
-//               onClick={() => onSearch(artist)}
-//               className="px-4 py-2 bg-gray-800/50 text-gray-300 rounded-full text-sm transition-all duration-300 border border-gray-700 hover:text-white hover:bg-gradient-to-r hover:from-sky-900/30 hover:via-blue-900/30 hover:to-indigo-900/30"
-//             >
-//               {artist}
-//             </button>
-//           ))}
-//         </div>
-//       </div>
-//     </div>
-//   );
-// }
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { Player } from '@lottiefiles/react-lottie-player';
+import dynamic from 'next/dynamic';
+
+// Dynamic import of Lottie Player to prevent SSR issues
+const Player = dynamic(
+  () =>
+    import('@lottiefiles/react-lottie-player').then((mod) => ({
+      default: mod.Player,
+    })),
+  { ssr: false }
+);
 
 type DefaultContentProps = {
   onSearch: (artistName: string) => void;
@@ -60,34 +19,18 @@ type DefaultContentProps = {
 const FALLBACK_ARTISTS = [
   'The Beatles',
   'Radiohead',
-  'Kendrick Lamar',
+  'Daft Punk',
   'Taylor Swift',
   'Pink Floyd',
 ] as const;
 
 export default function DefaultContent({ onSearch }: DefaultContentProps) {
-  const [suggestedArtists, setSuggestedArtists] = useState<string[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [randomArtist, setRandomArtist] = useState<string>('');
 
   useEffect(() => {
-    const fetchRandomArtists = async () => {
-      try {
-        const response = await fetch('/api/random-artists');
-        if (response.ok) {
-          const data = await response.json();
-          setSuggestedArtists(data.artists);
-        } else {
-          setSuggestedArtists([...FALLBACK_ARTISTS]);
-        }
-      } catch (error) {
-        console.error('Failed to fetch random artists:', error);
-        setSuggestedArtists([...FALLBACK_ARTISTS]);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchRandomArtists();
+    // Pick a random artist for the button
+    const randomIndex = Math.floor(Math.random() * FALLBACK_ARTISTS.length);
+    setRandomArtist(FALLBACK_ARTISTS[randomIndex]);
   }, []);
 
   return (
@@ -120,27 +63,18 @@ export default function DefaultContent({ onSearch }: DefaultContentProps) {
         </p>
 
         <div className="flex flex-wrap gap-2 justify-center min-h-[44px]">
-          {isLoading ? (
-            <div className="flex gap-2">
-              {[...Array(5)].map((_, i) => (
-                <div
-                  key={i}
-                  className="h-9 w-24 bg-gray-800/50 rounded-full animate-pulse border border-gray-700"
-                />
-              ))}
-            </div>
-          ) : (
-            suggestedArtists.map((artist) => (
-              <button
-                key={artist}
-                onClick={() => onSearch(artist)}
-                className="px-4 py-2 bg-gray-800/50 text-gray-300 rounded-full text-sm transition-all duration-300 border border-gray-700 hover:text-white hover:bg-gradient-to-r hover:from-sky-900/30 hover:via-blue-900/30 hover:to-indigo-900/30 cursor-pointer"
-                tabIndex={0}
-                aria-label={`Search for ${artist}`}
-              >
-                {artist}
-              </button>
-            ))
+          {/* Random artist button */}
+          {randomArtist && (
+            <button
+              onClick={() => onSearch(randomArtist)}
+              className="px-6 py-3 bg-gradient-to-r from-sky-600 via-blue-600 to-indigo-600 
+                         text-white font-semibold rounded-lg
+                         hover:from-sky-500 hover:via-blue-500 hover:to-indigo-500
+                         transition-all duration-200 transform hover:scale-105 
+                         shadow-lg hover:shadow-xl"
+            >
+              Try {randomArtist}
+            </button>
           )}
         </div>
       </div>

@@ -2,7 +2,16 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { Player } from '@lottiefiles/react-lottie-player';
+import dynamic from 'next/dynamic';
+
+// Dynamic import of Lottie Player to prevent SSR issues
+const Player = dynamic(
+  () =>
+    import('@lottiefiles/react-lottie-player').then((mod) => ({
+      default: mod.Player,
+    })),
+  { ssr: false }
+);
 
 interface LoadingScreenProps {
   message?: string;
