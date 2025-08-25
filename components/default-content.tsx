@@ -71,7 +71,7 @@ export default function DefaultContent({ onSearch }: DefaultContentProps) {
                          text-white font-semibold rounded-lg
                          hover:from-sky-500 hover:via-blue-500 hover:to-indigo-500
                          transition-all duration-200 transform hover:scale-105 
-                         shadow-lg hover:shadow-xl"
+                         shadow-lg hover:shadow-xl cursor-pointer"
             >
               Try {randomArtist}
             </button>
