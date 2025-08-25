@@ -57,7 +57,6 @@ export default function Header({
 
           {/* Mode Toggle */}
           <div className="flex items-center gap-2 mt-1 ">
-            {/* <span className="text-xs text-gray-400">Mode:</span> */}
             <TooltipProvider>
               <div className="inline-flex rounded-lg border border-gray-700 overflow-hidden ">
                 <Tooltip>
@@ -94,7 +93,10 @@ export default function Header({
                     </button>
                   </TooltipTrigger>
                   <TooltipContent className="bg-gray-900 text-white border border-gray-700">
-                    <p>Clicking the artist image will map the artist&apos;s connections</p>
+                    <p>
+                      Clicking the artist image will map the artist&apos;s
+                      connections
+                    </p>
                   </TooltipContent>
                 </Tooltip>
               </div>
