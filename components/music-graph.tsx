@@ -23,7 +23,7 @@ interface MusicGraphProps {
   onNodeClick?: (node: GraphNode) => void;
   onNodeHover?: (node: GraphNode | null) => void;
   selectedNode?: string | null;
-  centerNodeName?: string | null; // NEW: explicit center request
+  centerNodeName?: string | null;
 }
 
 const genreColors: Record<string, string> = {
@@ -67,16 +67,25 @@ export default function MusicGraph({
 
   useEffect(() => {
     if (graphRef.current && data.nodes.length > 0) {
-      graphRef.current.d3Force('charge').strength(-300);
-      graphRef.current
-        .d3Force('link')
-        .distance((link: any) => 50 / (link.value || 1)); // eslint-disable-line @typescript-eslint/no-explicit-any
-      graphRef.current.d3Force('center').strength(0.05);
+      const charge = graphRef.current.d3Force('charge') as
+        | { strength: (n: number) => void }
+        | undefined;
+      charge?.strength(-300);
+
+      const linkForce = graphRef.current.d3Force('link') as
+        | { distance: (fn: (l: ForceGraphLink) => number) => void }
+        | undefined;
+      linkForce?.distance((link) => 50 / (link.value || 1));
+
+      const center = graphRef.current.d3Force('center') as
+        | { strength: (n: number) => void }
+        | undefined;
+      center?.strength(0.05);
+
       setTimeout(() => graphRef.current?.zoomToFit(400, 50), 500);
     }
   }, [data]);
 
-  // Smoothly center on a specific node when requested
   useEffect(() => {
     if (!centerNodeName || !graphRef.current) return;
     const t = setTimeout(() => {
@@ -85,20 +94,23 @@ export default function MusicGraph({
         | ForceGraphNode
         | undefined;
       if (!node) return;
+
+      const centerAndZoom = (n: ForceGraphNode) => {
+        if (!fg) return;
+        fg.centerAt((n.x as number) ?? 0, (n.y as number) ?? 0, 1000);
+        fg.zoom(2, 1000);
+      };
+
       if (node.x == null || node.y == null) {
         setTimeout(() => {
           const retry = data.nodes.find((n) => n.name === centerNodeName) as
             | ForceGraphNode
             | undefined;
-          if (retry && retry.x != null && retry.y != null) {
-            fg.centerAt(retry.x as number, retry.y as number, 1000);
-            fg.zoom(2, 1000);
-          }
+          if (retry && retry.x != null && retry.y != null) centerAndZoom(retry);
         }, 300);
         return;
       }
-      fg.centerAt(node.x as number, node.y as number, 1000);
-      fg.zoom(2, 1000);
+      centerAndZoom(node);
     }, 150);
     return () => clearTimeout(t);
   }, [centerNodeName, data.nodes]);
@@ -187,7 +199,8 @@ export default function MusicGraph({
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
 
-      if (isHovered || node.depth === 0 || globalScale > 1) {
+      // keep the always-visible label under the node (not a tooltip)
+      if (node.depth === 0 || globalScale > 1) {
         const textY = y + nodeSize + fontSize;
         ctx.fillStyle = '#fff';
         ctx.fillText(label, x, textY);
@@ -220,8 +233,8 @@ export default function MusicGraph({
       gradient.addColorStop(1, '#4f46e533');
 
       ctx.strokeStyle = gradient;
-      ctx.lineWidth = Math.max(0.5, link.value * 2);
-      ctx.globalAlpha = 0.3 + link.value * 0.4;
+      ctx.lineWidth = Math.max(0.5, (link.value ?? 1) * 2);
+      ctx.globalAlpha = 0.3 + (link.value ?? 1) * 0.4;
       ctx.beginPath();
       ctx.moveTo(startX, startY);
       ctx.lineTo(endX, endY);
@@ -288,13 +301,15 @@ export default function MusicGraph({
           ctx.arc(x, y, nodeSize * 1.2, 0, 2 * Math.PI);
           ctx.fill();
         }}
-        enableNodeDrag={true}
-        enableZoomInteraction={true}
-        enablePanInteraction={true}
+        enableNodeDrag
+        enableZoomInteraction
+        enablePanInteraction
         minZoom={0.1}
         maxZoom={5}
         cooldownTicks={100}
         onEngineStop={() => graphRef.current?.zoomToFit(400, 50)}
+        /** Turn OFF the built-in hover tooltip completely */
+        nodeLabel={() => ''}
       />
     </div>
   );
