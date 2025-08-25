@@ -1,27 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import * as Popover from '@radix-ui/react-popover';
 import { Palette } from 'lucide-react';
-
-// Tailwind v3 500-scale colors
-// High-contrast Tailwind mapping (varied weights to avoid lookalikes)
-const genreColors: Record<string, string> = {
-  rock: '#ef4444',       // red-500
-  pop: '#f59e0b',        // amber-500
-  electronic: '#84cc16', // lime-500
-  'hip hop': '#16a34a',  // green-600 (darker than lime)
-  jazz: '#2dd4bf',       // teal-400 (pulled left of cyan for separation)
-  classical: '#0284c7',  // sky-600 (darker than teal/cyan family)
-  metal: '#3b82f6',      // blue-500
-  indie: '#4f46e5',      // indigo-600 (deeper than blue)
-  folk: '#7c3aed',       // violet-600
-  blues: '#c084fc',      // purple-400 (lighter than violet so they don’t merge)
-  country: '#e879f9',    // fuchsia-400
-  alternative: '#f43f5e',// rose-500
-  unknown: '#71717a',    // zinc-500
-};
-
+import { GENRE_COLOR_MAP } from '@/lib/genres';
 
 export default function Legend() {
   const [open, setOpen] = useState(false);
@@ -41,33 +23,46 @@ export default function Legend() {
 
         <Popover.Portal>
           <Popover.Content
-            className="z-50 w-64 rounded-lg bg-gray-900/95 backdrop-blur-md border border-gray-700 p-4 shadow-2xl"
+            className="z-50 w-[22rem] rounded-lg bg-gray-900/95 backdrop-blur-md border border-gray-700 p-4 shadow-2xl"
             sideOffset={8}
             align="start"
           >
-            <div className="space-y-1">
-              <h3 className="mb-3 text-sm font-semibold text-white">
-                Genre Colors
-              </h3>
-              <div className="grid grid-cols-2 gap-2">
-                {Object.entries(genreColors).map(([genre, color]) => (
-                  <div key={genre} className="flex items-center gap-2">
-                    <div
-                      className="h-3 w-3 rounded-full border border-white/20"
-                      style={{ backgroundColor: color }}
-                      aria-hidden="true"
-                    />
-                    <span className="text-xs text-gray-300 capitalize">
-                      {genre}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
+            <LegendContent />
             <Popover.Arrow className="fill-gray-900/95" />
           </Popover.Content>
         </Popover.Portal>
       </Popover.Root>
+    </div>
+  );
+}
+
+function LegendContent() {
+  // Alphabetical order of all genres
+  const items = useMemo(() => {
+    return Object.entries(GENRE_COLOR_MAP).sort(([a], [b]) =>
+      a.localeCompare(b)
+    );
+  }, []);
+
+  return (
+    <div className="space-y-2">
+      <h3 className="mb-1 text-sm font-semibold text-white">Genre Colors</h3>
+      <div className="max-h-72 overflow-auto pr-1">
+        <div className="grid grid-cols-3 gap-x-3 gap-y-2">
+          {items.map(([genre, color]) => (
+            <div key={genre} className="flex items-center gap-2 min-w-0">
+              <div
+                className="h-3 w-3 shrink-0 rounded-full border border-white/20"
+                style={{ backgroundColor: color }}
+                aria-hidden="true"
+              />
+              <span className="text-xs text-gray-300 capitalize truncate">
+                {genre}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }

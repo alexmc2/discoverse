@@ -172,7 +172,7 @@ export default function SearchBar({ onSearch, isLoading }: SearchBarProps) {
                     </div>
                   )}
                   <div className="flex-1">
-                    <div className="text-white font-medium">{artist.name}</div>
+                    <div className="text-white font-medium cursor-pointer">{artist.name}</div>
                   </div>
                 </button>
               ))}

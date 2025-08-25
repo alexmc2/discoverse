@@ -31,7 +31,7 @@ export default function Header({
             <Music2 className="w-6 h-6 text-white" />
           </div>
 
-          <h1 className="text-3xl font-bold text-white">Music Map</h1>
+          <h1 className="text-3xl font-bold text-white">Sound Stars</h1>
 
           {hasSearched && hasData && (
             <button

@@ -8,6 +8,7 @@ import ForceGraph2D, {
   LinkObject,
 } from 'react-force-graph-2d';
 import { GraphNode, GraphLink } from '@/lib/lastfm';
+import { getGenreColor } from '@/lib/genres';
 
 interface ForceGraphNode extends GraphNode {
   x?: number;
@@ -30,25 +31,6 @@ interface MusicGraphProps {
   selectedNode?: string | null;
   centerNodeName?: string | null;
 }
-
-// Tailwind v3 500-scale colors
-// High-contrast Tailwind mapping (varied weights to avoid lookalikes)
-const genreColors: Record<string, string> = {
-  rock: '#ef4444',       // red-500
-  pop: '#f59e0b',        // amber-500
-  electronic: '#84cc16', // lime-500
-  'hip hop': '#16a34a',  // green-600 (darker than lime)
-  jazz: '#2dd4bf',       // teal-400 (pulled left of cyan for separation)
-  classical: '#0284c7',  // sky-600 (darker than teal/cyan family)
-  metal: '#3b82f6',      // blue-500
-  indie: '#4f46e5',      // indigo-600 (deeper than blue)
-  folk: '#7c3aed',       // violet-600
-  blues: '#c084fc',      // purple-400 (lighter than violet so they don’t merge)
-  country: '#e879f9',    // fuchsia-400
-  alternative: '#f43f5e',// rose-500
-  unknown: '#71717a',    // zinc-500
-};
-
 
 // Lighten a hex color toward white by `strength` (0..1)
 const lightenHex = (hex: string, strength = 0.45): string => {
@@ -74,7 +56,6 @@ export default function MusicGraph({
   selectedNode,
   centerNodeName,
 }: MusicGraphProps) {
-  // IMPORTANT: use the exact generics react-force-graph-2d expects
   const graphRef = useRef<ForceGraphMethods<RFNode, RFLink> | undefined>(
     undefined
   );
@@ -167,7 +148,6 @@ export default function MusicGraph({
     const fg = graphRef.current;
     if (!fg) return;
 
-    // The 2D instance exposes .canvas(), but it isn't typed in defs
     const canvas = (
       fg as unknown as { canvas?: () => HTMLCanvasElement | null }
     ).canvas?.();
@@ -228,7 +208,7 @@ export default function MusicGraph({
       const pxToGraphX = centerAXp.x - centerA.x;
       const pxToGraphY = centerAXp.y - centerA.y;
 
-      k.vx = -vxPx * pxToGraphX; // world moves opposite the drag
+      k.vx = -vxPx * pxToGraphX;
       k.vy = -vyPx * pxToGraphY;
       k.active = true;
 
@@ -236,7 +216,7 @@ export default function MusicGraph({
       let cy = centerA.y;
       let lastTime = performance.now();
 
-      const friction = 0.94; // lower => longer glide
+      const friction = 0.94;
       const stopSpeed = 0.0005;
 
       const tick = () => {
@@ -286,11 +266,7 @@ export default function MusicGraph({
   }, [dimensions.width, dimensions.height]);
 
   const getNodeColor = useCallback((node: GraphNode) => {
-    const genre = node.group?.toLowerCase() || 'unknown';
-    for (const [key, color] of Object.entries(genreColors)) {
-      if (genre.includes(key)) return color;
-    }
-    return genreColors.unknown;
+    return getGenreColor(node.group || 'unknown');
   }, []);
 
   const nodeCanvasObject = useCallback(
@@ -310,10 +286,10 @@ export default function MusicGraph({
 
       if (isHovered || isSelected || node.depth === 0) {
         ctx.shadowColor = nodeColor;
-        ctx.shadowBlur = isSelected ? 12 : isHovered ? 6 : 4; // softer shadow
-        ctx.fillStyle = nodeColor + '22'; // dimmer halo (alpha ↓)
+        ctx.shadowBlur = isSelected ? 12 : isHovered ? 6 : 4;
+        ctx.fillStyle = nodeColor + '22';
         ctx.beginPath();
-        ctx.arc(x, y, nodeSize * 1.2, 0, 2 * Math.PI); // smaller halo radius
+        ctx.arc(x, y, nodeSize * 1.2, 0, 2 * Math.PI);
         ctx.fill();
         ctx.shadowBlur = 0;
       }
@@ -359,7 +335,6 @@ export default function MusicGraph({
         }
       }
 
-      // Ring uses node color; on hover we brighten it; on select we keep a thicker white ring
       const ringColor = isSelected
         ? '#fff'
         : isHovered
@@ -377,7 +352,7 @@ export default function MusicGraph({
 
       {
         const textY = y + nodeSize + fontSize;
-        const strokeW = Math.max(1.5 / globalScale, 0.5); // zoom-invariant outline
+        const strokeW = Math.max(1.5 / globalScale, 0.5);
         ctx.lineWidth = strokeW;
         ctx.strokeStyle = 'rgba(0,0,0,0.45)';
         ctx.strokeText(label, x, textY);

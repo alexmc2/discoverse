@@ -60,7 +60,7 @@ export default function DefaultContent({ onSearch }: DefaultContentProps) {
 
         <p className="text-gray-400 max-w-md mx-auto mb-8">
           See how artists connect through genres and influences in an
-          interactive constellation.
+          interactive star map.
         </p>
 
         <div className="flex flex-wrap gap-2 justify-center min-h-[44px]">
