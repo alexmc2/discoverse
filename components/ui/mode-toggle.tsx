@@ -44,7 +44,7 @@ export default function ModeToggle({
               </button>
             </TooltipTrigger>
             <TooltipContent className="bg-gray-800 text-white border border-gray-700">
-              <p>Click artist image to open the info panel</p>
+              <p>Click artist image to open info panel</p>
             </TooltipContent>
           </Tooltip>
 
@@ -71,9 +71,9 @@ export default function ModeToggle({
         {/* Mobile-only helper text since tooltips don't work well on touch devices */}
         <div className="mt-1 sm:hidden text-xs leading-snug text-gray-400">
           {mode === 'map' ? (
-            <p>Click artist image to map connections</p>
+            <p>Click artist image to map more connections</p>
           ) : (
-            <p>Click artist image to open the info panel</p>
+            <p>Click artist image to open info panel</p>
           )}
         </div>
       </TooltipProvider>
