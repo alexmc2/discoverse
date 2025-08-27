@@ -1,8 +1,6 @@
 // lib/spotify.ts
 // Spotify Web API integration + robust previews with iTunes fallback.
-// - Tries multiple Spotify markets to find preview_url
-// - Falls back to Apple iTunes Search API for 30s previews (CORS-friendly)
-// - No `any` usage; strict TS.
+// Safe for both client AND server environments.
 
 interface SpotifyToken {
   access_token: string;
@@ -72,12 +70,27 @@ interface ITunesSearchResponse {
 // ===== Token cache =====
 let cachedToken: { token: string; expires: number } | null = null;
 
+function resolveUrl(path: string): string {
+  if (/^https?:\/\//i.test(path)) return path;
+  if (typeof window !== 'undefined') return path;
+
+  const explicit = process.env.NEXT_PUBLIC_SITE_URL;
+  if (explicit) return explicit.replace(/\/$/, '') + path;
+
+  const vercel = process.env.VERCEL_URL;
+  if (vercel) return `https://${vercel}${path}`;
+
+  const port = process.env.PORT || '3000';
+  return `http://localhost:${port}${path}`;
+}
+
 async function getSpotifyToken(): Promise<string | null> {
   if (cachedToken && Date.now() < cachedToken.expires) {
     return cachedToken.token;
   }
   try {
-    const res = await fetch('/api/spotify/token', { method: 'POST' });
+    const url = resolveUrl('/api/spotify/token');
+    const res = await fetch(url, { method: 'POST' });
     if (res.status === 501) return null; // credentials not configured
     if (!res.ok) throw new Error('Failed to get Spotify token');
     const data: SpotifyToken = await res.json();
@@ -88,14 +101,13 @@ async function getSpotifyToken(): Promise<string | null> {
     };
     return cachedToken.token;
   } catch (e) {
-    console.error('Error getting Spotify token:', e);
+    console.error('Error getting Spotify token:', e as Error);
     return null;
   }
 }
 
 // ===== Helpers =====
 function detectMarketPriority(): string[] {
-  // e.g. "en-GB" -> "GB"
   let first: string | null = null;
   try {
     const locale = Intl.DateTimeFormat().resolvedOptions().locale || '';
@@ -126,7 +138,7 @@ async function spotifyGET<T>(url: string, token: string): Promise<T | null> {
   }
 }
 
-// ===== Public: search + images =====
+// ===== Public: search + images + url =====
 export async function searchSpotifyArtist(
   artistName: string
 ): Promise<SpotifyArtist | null> {
@@ -154,6 +166,19 @@ export async function getArtistImage(
   }
 }
 
+// NEW: exported and typed Spotify URL helper
+export async function getArtistSpotifyUrl(
+  artistName: string
+): Promise<string | undefined> {
+  try {
+    const artist = await searchSpotifyArtist(artistName);
+    if (!artist) return undefined;
+    return `https://open.spotify.com/artist/${artist.id}`;
+  } catch {
+    return undefined;
+  }
+}
+
 export async function getArtistImages(
   artistNames: string[]
 ): Promise<Map<string, string>> {
@@ -176,7 +201,6 @@ async function fetchITunesPreview(
   track: string
 ): Promise<string | null> {
   try {
-    // Use media=music and entity=song to keep it tight; iTunes is CORS-enabled
     const url = `https://itunes.apple.com/search?term=${encodeURIComponent(
       `${artist} ${track}`
     )}&media=music&entity=song&limit=5`;
@@ -189,7 +213,6 @@ async function fetchITunesPreview(
     const lowerArtist = artist.toLowerCase();
     const lowerTrack = track.toLowerCase();
 
-    // Prefer near-exact match on both artist and track
     const exact = data.results.find((r) => {
       const a = (r.artistName || '').toLowerCase();
       const t = (r.trackName || '').toLowerCase();
@@ -203,7 +226,6 @@ async function fetchITunesPreview(
   }
 }
 
-// Attach iTunes previews to any track without preview_url
 async function enrichWithITunesPreviews(
   artistName: string,
   tracks: SpotifyTrack[]
@@ -245,7 +267,6 @@ export async function getArtistTopTracks(
     ? [marketHint, ...detectMarketPriority().filter((m) => m !== marketHint)]
     : detectMarketPriority();
 
-  // Try each market until we get any tracks
   let tracks: SpotifyTrack[] = [];
   for (const market of marketOrder) {
     const url = `https://api.spotify.com/v1/artists/${artist.id}/top-tracks?market=${market}`;
@@ -257,7 +278,6 @@ export async function getArtistTopTracks(
   }
   if (!tracks.length) return [];
 
-  // If no previews, try merging from other markets by name match
   const hasAnyPreview = tracks.some((t) => !!t.preview_url);
   if (!hasAnyPreview) {
     for (const market of marketOrder) {
@@ -276,7 +296,6 @@ export async function getArtistTopTracks(
     }
   }
 
-  // iTunes fallback for any remaining missing previews
   if (tracks.some((t) => !t.preview_url)) {
     await enrichWithITunesPreviews(artistName, tracks);
   }

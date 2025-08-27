@@ -14,11 +14,11 @@ const interTight = Inter_Tight({
 });
 
 export const metadata: Metadata = {
-  title: 'Music Map | Explore Artist Connections',
+  title: 'Soundstars | Explore Artist Connections',
   description:
     'Discover musical connections between artists in an interactive star map. Explore how your favorite artists relate through genres and influences.',
   keywords:
-    'music, artists, visualization, graph, network, last.fm, music discovery',
+    'music, artists, visualisation, graph, network, last.fm, music discovery',
   authors: [{ name: 'Music Map' }],
   openGraph: {
     title: 'Music Map | Explore Artist Connections',

@@ -1,0 +1,10 @@
+{
+  "search.useIgnoreFiles": true,
+  "search.exclude": {
+    "**/.next/**": true,
+    "**/node_modules/**": true,
+    "**/out/**": true,
+    "**/build/**": true,
+    "**/.git/**": true
+  }
+}

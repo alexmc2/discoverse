@@ -1,26 +1,63 @@
 // lib/lastfm.ts
-import axios from 'axios';
 import { getArtistImage } from './spotify';
 
-// Use local API route to avoid CORS issues
-const BASE_URL = '/api/lastfm';
+const LASTFM_API_KEY = process.env.NEXT_PUBLIC_LASTFM_API_KEY || '';
+const LASTFM_BASE = 'https://ws.audioscrobbler.com/2.0/';
+const MIN_LISTENERS = 50;
 
-interface LastFmArtist {
+function isServer() {
+  return typeof window === 'undefined';
+}
+
+/** ===== Types from Last.fm responses (subset) ===== */
+
+type LfImage = {
+  '#text': string;
+  size: 'small' | 'medium' | 'large' | 'extralarge' | 'mega';
+};
+type LfTag = { name: string; url?: string };
+type LfArtistRef = {
   name: string;
+  url?: string;
   mbid?: string;
-  match?: string;
-  url: string;
-  image?: Array<{
-    '#text': string;
-    size: string;
-  }>;
-}
-
-interface LastFmTag {
+  image?: LfImage[];
+  match?: string | number;
+  listeners?: string; // present on artist.search responses
+};
+type LfSimilarArtists = { artist?: LfArtistRef[] };
+type LfTopTags = { tag?: LfTag[] };
+type LfArtistInfo = {
   name: string;
-  count: number;
-  url: string;
-}
+  url?: string;
+  image?: LfImage[];
+  stats?: { listeners?: string; playcount?: string };
+  bio?: { summary?: string };
+  tags?: { tag?: LfTag[] };
+};
+
+type LfSearchResults = {
+  results?: {
+    artistmatches?: {
+      artist?: LfArtistRef[];
+    };
+  };
+};
+
+type LfSimilarResp = { similarartists?: LfSimilarArtists };
+type LfTopTagsResp = { toptags?: LfTopTags };
+type LfInfoResp = { artist?: LfArtistInfo };
+type LfTopTracksResp = {
+  toptracks?: {
+    track?: Array<{
+      name: string;
+      playcount?: string;
+      url?: string;
+      artist?: { name?: string };
+    }>;
+  };
+};
+
+/** ===== Public model types ===== */
 
 export interface Artist {
   id: string;
@@ -34,7 +71,7 @@ export interface Artist {
 export interface GraphNode {
   id: string;
   name: string;
-  group?: string;
+  group?: string; // first tag (normalized)
   size?: number;
   image?: string;
   tags?: string[];
@@ -47,112 +84,6 @@ export interface GraphLink {
   value: number;
 }
 
-interface CacheEntry {
-  data: unknown;
-  timestamp: number;
-}
-
-const cache = new Map<string, CacheEntry>();
-const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
-
-async function fetchWithCache(url: string) {
-  const cached = cache.get(url);
-  if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
-    return cached.data;
-  }
-
-  try {
-    const response = await axios.get(url);
-    cache.set(url, { data: response.data, timestamp: Date.now() });
-    return response.data;
-  } catch (error) {
-    console.error('API fetch error:', error);
-    throw error;
-  }
-}
-
-export async function searchArtist(query: string): Promise<Artist[]> {
-  if (!query) return [];
-  
-  const url = `${BASE_URL}?method=artist.search&artist=${encodeURIComponent(query)}&limit=30`;
-  
-  try {
-    const data = await fetchWithCache(url);
-    const artists = data?.results?.artistmatches?.artist || [];
-    
-    return artists.map((artist: LastFmArtist, index: number) => ({
-      id: artist.mbid ? `${artist.mbid}-${index}` : `${artist.name}-${index}`,
-      name: artist.name,
-      url: artist.url,
-      image: artist.image?.find(img => img.size === 'large')?.['#text']
-    }));
-  } catch (error) {
-    console.error('Search error:', error);
-    return [];
-  }
-}
-
-export async function getSimilarArtists(artistName: string, limit: number = 20): Promise<Artist[]> {
-  const url = `${BASE_URL}?method=artist.getsimilar&artist=${encodeURIComponent(artistName)}&limit=${limit}`;
-  
-  try {
-    const data = await fetchWithCache(url);
-    const similar = data?.similarartists?.artist || [];
-    
-    return similar.map((artist: LastFmArtist, index: number) => ({
-      id: artist.mbid ? `${artist.mbid}-${index}` : `${artist.name}-${index}`,
-      name: artist.name,
-      match: parseFloat(artist.match || '0'),
-      url: artist.url,
-      image: artist.image?.find(img => img.size === 'large')?.['#text']
-    }));
-  } catch (error) {
-    console.error('Similar artists error:', error);
-    return [];
-  }
-}
-
-export async function getArtistTags(artistName: string): Promise<string[]> {
-  const url = `${BASE_URL}?method=artist.gettoptags&artist=${encodeURIComponent(artistName)}`;
-  
-  try {
-    const data = await fetchWithCache(url);
-    const tags = data?.toptags?.tag || [];
-    
-    return tags
-      .slice(0, 5)
-      .map((tag: LastFmTag) => tag.name)
-      .filter((tag: string) => tag && tag.length > 0);
-  } catch (error) {
-    console.error('Tags error:', error);
-    return [];
-  }
-}
-
-export async function getArtistInfo(artistName: string) {
-  const url = `${BASE_URL}?method=artist.getinfo&artist=${encodeURIComponent(artistName)}`;
-  
-  try {
-    const data = await fetchWithCache(url);
-    const artist = data?.artist;
-    
-    if (!artist) return null;
-    
-    return {
-      name: artist.name,
-      url: artist.url,
-      image: artist.image?.find((img: { size: string; '#text': string }) => img.size === 'extralarge')?.['#text'],
-      listeners: parseInt(artist.stats?.listeners || '0'),
-      playcount: parseInt(artist.stats?.playcount || '0'),
-      bio: artist.bio?.summary?.replace(/<[^>]*>/g, '').split('Read more')[0],
-      tags: artist.tags?.tag?.slice(0, 5).map((tag: { name: string }) => tag.name) || []
-    };
-  } catch (error) {
-    console.error('Artist info error:', error);
-    return null;
-  }
-}
-
 export interface Track {
   name: string;
   playcount: number;
@@ -160,146 +91,338 @@ export interface Track {
   artist: string;
 }
 
-export async function getTopTracks(artistName: string, limit: number = 10): Promise<Track[]> {
-  const url = `${BASE_URL}?method=artist.gettoptracks&artist=${encodeURIComponent(artistName)}&limit=${limit}`;
-  
-  try {
-    const data = await fetchWithCache(url);
-    const tracks = data?.toptracks?.track || [];
-    
-    return tracks.map((track: { 
-      name: string; 
-      playcount: string; 
-      url: string;
-      artist: { name: string } 
-    }) => ({
-      name: track.name,
-      playcount: parseInt(track.playcount || '0'),
-      url: track.url,
-      artist: track.artist?.name || artistName
-    }));
-  } catch (error) {
-    console.error('Top tracks error:', error);
-    return [];
-  }
+/** ===== Helpers ===== */
+
+function firstImage(images?: LfImage[], pref: LfImage['size'] = 'extralarge') {
+  if (!images || images.length === 0) return '';
+  const best = images.find((img) => img.size === pref)?.['#text'] || '';
+  return best || images[images.length - 1]['#text'] || '';
 }
 
-export async function buildGraphData(seedArtist: string, depth: number = 2) {
-  const nodes: Map<string, GraphNode> = new Map();
+function normalizeTag(tag?: string) {
+  return (tag || 'unknown').toLowerCase();
+}
+
+/** ===== Core GET helper ===== */
+
+async function lastfmGet<T>(
+  method: string,
+  params: Record<string, string | number> = {}
+): Promise<T> {
+  const url = new URL(LASTFM_BASE);
+  url.searchParams.set('method', method);
+  url.searchParams.set('format', 'json');
+
+  // Provide API key on both server and client when available
+  if (isServer()) {
+    if (!LASTFM_API_KEY) throw new Error('Missing NEXT_PUBLIC_LASTFM_API_KEY');
+    url.searchParams.set('api_key', LASTFM_API_KEY);
+  } else if (LASTFM_API_KEY) {
+    url.searchParams.set('api_key', LASTFM_API_KEY);
+  }
+
+  for (const [k, v] of Object.entries(params)) {
+    url.searchParams.set(k, String(v));
+  }
+
+  const res = await fetch(url.toString(), { next: { revalidate: 60 } });
+  if (!res.ok) throw new Error(`Last.fm error ${res.status} for ${method}`);
+  return (await res.json()) as T;
+}
+
+/** ===== Public API ===== */
+
+// Filter out tiny artists (default: min 50 listeners) for cleaner suggestions.
+export async function searchArtist(
+  query: string,
+  minListeners = MIN_LISTENERS
+): Promise<Artist[]> {
+  if (!query) return [];
+  const data = await lastfmGet<LfSearchResults>('artist.search', {
+    artist: query,
+    limit: 30,
+  });
+  const artists = data?.results?.artistmatches?.artist ?? [];
+
+  const filtered = (artists || []).filter((a) => {
+    const listeners = parseInt(a.listeners || '0', 10);
+    return Number.isFinite(listeners) && listeners >= minListeners;
+  });
+
+  return filtered.map((artist, index) => ({
+    id: artist.mbid ? `${artist.mbid}-${index}` : `${artist.name}-${index}`,
+    name: artist.name,
+    url: artist.url,
+    image: firstImage(artist.image, 'large'),
+  }));
+}
+
+export async function getSimilarArtists(
+  artistName: string,
+  limit = 20
+): Promise<Artist[]> {
+  const data = await lastfmGet<LfSimilarResp>('artist.getsimilar', {
+    artist: artistName,
+    limit,
+  });
+  const similar = data?.similarartists?.artist ?? [];
+  return (similar || []).map((artist, index) => ({
+    id: artist.mbid ? `${artist.mbid}-${index}` : `${artist.name}-${index}`,
+    name: artist.name,
+    match:
+      typeof artist.match === 'string'
+        ? parseFloat(artist.match)
+        : artist.match ?? 0,
+    url: artist.url,
+    image: firstImage(artist.image, 'large'),
+  }));
+}
+
+export async function getArtistTags(artistName: string): Promise<string[]> {
+  const data = await lastfmGet<LfTopTagsResp>('artist.gettoptags', {
+    artist: artistName,
+  });
+  const tags = data?.toptags?.tag ?? [];
+  return (tags || [])
+    .slice(0, 5)
+    .map((t) => t.name)
+    .filter((t): t is string => !!t && t.length > 0);
+}
+
+export async function getArtistInfo(artistName: string) {
+  const data = await lastfmGet<LfInfoResp>('artist.getinfo', {
+    artist: artistName,
+  });
+  const artist = data?.artist;
+  if (!artist) return null;
+
+  return {
+    name: artist.name,
+    url: artist.url ?? '',
+    image: firstImage(artist.image, 'extralarge'),
+    listeners: parseInt(artist.stats?.listeners || '0', 10),
+    playcount: parseInt(artist.stats?.playcount || '0', 10),
+    bio: (artist.bio?.summary || '')
+      .replace(/<[^>]*>/g, '')
+      .split('Read more')[0],
+    tags:
+      artist.tags?.tag
+        ?.slice(0, 5)
+        .map((t) => t.name)
+        .filter((t): t is string => !!t) ?? [],
+  };
+}
+
+export async function getTopTracks(
+  artistName: string,
+  limit = 10
+): Promise<Track[]> {
+  const data = await lastfmGet<LfTopTracksResp>('artist.gettoptracks', {
+    artist: artistName,
+    limit,
+  });
+  const tracks = data?.toptracks?.track ?? [];
+  return (tracks || []).map((track) => ({
+    name: track.name,
+    playcount: parseInt(track.playcount || '0', 10),
+    url: track.url || '',
+    artist: track.artist?.name || artistName,
+  }));
+}
+
+/** ===== Image + Listeners memos (type-safe, no `any`) ===== */
+
+declare global {
+  var __lf_imageMemo: Map<string, Promise<string | undefined>> | undefined;
+  var __lf_listenersMemo: Map<string, Promise<number | null>> | undefined;
+}
+
+const imageMemo: Map<
+  string,
+  Promise<string | undefined>
+> = globalThis.__lf_imageMemo ?? new Map<string, Promise<string | undefined>>();
+if (!globalThis.__lf_imageMemo) {
+  globalThis.__lf_imageMemo = imageMemo;
+}
+
+const listenersMemo: Map<
+  string,
+  Promise<number | null>
+> = globalThis.__lf_listenersMemo ?? new Map<string, Promise<number | null>>();
+if (!globalThis.__lf_listenersMemo) {
+  globalThis.__lf_listenersMemo = listenersMemo;
+}
+
+function getImageMemoized(name: string): Promise<string | undefined> {
+  const key = name.toLowerCase();
+  if (!imageMemo.has(key)) {
+    imageMemo.set(
+      key,
+      (async (): Promise<string | undefined> => {
+        try {
+          return await getArtistImage(name);
+        } catch {
+          return undefined;
+        }
+      })()
+    );
+  }
+  return imageMemo.get(key)!;
+}
+
+async function getListenersMemoized(name: string): Promise<number | null> {
+  const key = name.toLowerCase();
+  if (!listenersMemo.has(key)) {
+    listenersMemo.set(
+      key,
+      (async (): Promise<number | null> => {
+        try {
+          const info = await getArtistInfo(name);
+          return info?.listeners ?? null;
+        } catch {
+          return null;
+        }
+      })()
+    );
+  }
+  return listenersMemo.get(key)!;
+}
+
+/** ===== Graph builder (filters nodes by MIN_LISTENERS) ===== */
+
+export async function buildGraphData(seedArtist: string, depth = 2) {
+  const nodes = new Map<string, GraphNode>();
   const links: GraphLink[] = [];
   const processed = new Set<string>();
-  
-  // Add seed artist with full info including image from Spotify
-  const [seedTags, seedInfo, spotifyImage] = await Promise.all([
+
+  const [seedTags, seedInfo, seedSpotifyImage] = await Promise.all([
     getArtistTags(seedArtist),
     getArtistInfo(seedArtist),
-    getArtistImage(seedArtist)
+    getImageMemoized(seedArtist),
   ]);
-  
+
   const seedNode: GraphNode = {
     id: seedArtist,
     name: seedArtist,
-    group: seedTags[0] || 'unknown',
+    group: normalizeTag(seedTags[0]),
     size: 20,
-    image: spotifyImage || seedInfo?.image,
+    image: seedSpotifyImage || seedInfo?.image,
     tags: seedTags,
-    depth: 0
+    depth: 0,
   };
   nodes.set(seedArtist, seedNode);
-  
-  // Get similar artists (depth 1)
+
   const similar = await getSimilarArtists(seedArtist, 15);
-  
-  // Fetch Spotify images for all similar artists in parallel
-  const artistNames = similar.map(a => a.name);
-  const spotifyImagePromises = artistNames.map(name => getArtistImage(name));
-  const spotifyImages = await Promise.all(spotifyImagePromises);
-  const imageMap = new Map<string, string | undefined>();
-  artistNames.forEach((name, i) => {
-    if (spotifyImages[i]) {
-      imageMap.set(name, spotifyImages[i]);
-    }
+
+  // Prefetch D1 images + listeners
+  const d1Names = similar.map((a) => a.name);
+  const [d1Images, d1Listeners] = await Promise.all([
+    Promise.all(d1Names.map(getImageMemoized)),
+    Promise.all(d1Names.map(getListenersMemoized)),
+  ]);
+  const d1ImageMap = new Map<string, string | undefined>();
+  const d1ListenerMap = new Map<string, number | null>();
+  d1Names.forEach((n, i) => {
+    d1ImageMap.set(n, d1Images[i]);
+    d1ListenerMap.set(n, d1Listeners[i]);
   });
-  
+
   for (const artist of similar) {
+    const listeners = d1ListenerMap.get(artist.name) ?? 0;
+    if ((listeners ?? 0) < MIN_LISTENERS) {
+      continue; // skip low-listener D1 nodes/links
+    }
+
     if (!nodes.has(artist.name)) {
       const tags = await getArtistTags(artist.name);
       nodes.set(artist.name, {
         id: artist.name,
         name: artist.name,
-        group: tags[0] || 'unknown',
+        group: normalizeTag(tags[0]),
         size: 10,
-        image: imageMap.get(artist.name) || artist.image,
+        image: d1ImageMap.get(artist.name) || artist.image,
         tags,
-        depth: 1
+        depth: 1,
       });
     }
-    
     links.push({
       source: seedArtist,
       target: artist.name,
-      value: artist.match || 0.5
+      value: artist.match ?? 0.5,
     });
   }
-  
-  // Get connections between similar artists (depth 2)
+
   if (depth >= 2) {
-    const similarNames = similar.slice(0, 8).map(a => a.name);
-    
-    for (const artistName of similarNames) {
-      if (processed.has(artistName)) continue;
-      processed.add(artistName);
-      
-      const secondLevel = await getSimilarArtists(artistName, 5);
-      
+    const d1KeptNames = similar
+      .map((a) => a.name)
+      .filter((n) => (d1ListenerMap.get(n) ?? 0) >= MIN_LISTENERS)
+      .slice(0, 8);
+
+    for (const name of d1KeptNames) {
+      if (processed.has(name)) continue;
+      processed.add(name);
+
+      const secondLevel = await getSimilarArtists(name, 5);
+      const d2Names = secondLevel.map((a) => a.name);
+
+      // Very conservative images, but listeners we fetch for all candidates to filter
+      const d2CandidatesForImages = secondLevel.slice(0, 2).map((a) => a.name);
+      const [d2Images, d2Listeners] = await Promise.all([
+        Promise.all(d2CandidatesForImages.map(getImageMemoized)),
+        Promise.all(d2Names.map(getListenersMemoized)),
+      ]);
+      const d2ImageMap = new Map<string, string | undefined>();
+      d2CandidatesForImages.forEach((n, i) => d2ImageMap.set(n, d2Images[i]));
+      const d2ListenerMap = new Map<string, number | null>();
+      d2Names.forEach((n, i) => d2ListenerMap.set(n, d2Listeners[i]));
+
       for (const related of secondLevel) {
-        // Only add if it connects to existing nodes
-        if (nodes.has(related.name) && related.name !== artistName) {
+        const relListeners = d2ListenerMap.get(related.name) ?? 0;
+        if ((relListeners ?? 0) < MIN_LISTENERS) {
+          continue; // skip low-listener D2 nodes/links
+        }
+
+        if (nodes.has(related.name) && related.name !== name) {
           links.push({
-            source: artistName,
+            source: name,
             target: related.name,
-            value: (related.match || 0.5) * 0.7
+            value: (related.match ?? 0.5) * 0.7,
           });
-        } else if (!nodes.has(related.name) && nodes.size < 100) {
-          // Add new nodes up to limit
-          const [tags, spotifyImage] = await Promise.all([
-            getArtistTags(related.name),
-            getArtistImage(related.name)
-          ]);
+        } else if (!nodes.has(related.name) && nodes.size < 150) {
+          const tags = await getArtistTags(related.name);
           nodes.set(related.name, {
             id: related.name,
             name: related.name,
-            group: tags[0] || 'unknown',
-            size: 5,
-            image: spotifyImage || related.image,
+            group: normalizeTag(tags[0]),
+            size: 6,
+            image: d2ImageMap.get(related.name) || related.image,
             tags,
-            depth: 2
+            depth: 2,
           });
-          
           links.push({
-            source: artistName,
+            source: name,
             target: related.name,
-            value: (related.match || 0.5) * 0.5
+            value: (related.match ?? 0.5) * 0.5,
           });
         }
       }
     }
   }
-  
-  // Calculate node sizes based on connections
-  const connectionCount = new Map<string, number>();
-  links.forEach(link => {
-    connectionCount.set(link.source, (connectionCount.get(link.source) || 0) + 1);
-    connectionCount.set(link.target, (connectionCount.get(link.target) || 0) + 1);
+
+  // Size by degree
+  const degree = new Map<string, number>();
+  links.forEach((l) => {
+    degree.set(l.source, (degree.get(l.source) || 0) + 1);
+    degree.set(l.target, (degree.get(l.target) || 0) + 1);
   });
-  
-  nodes.forEach(node => {
-    const connections = connectionCount.get(node.id) || 1;
-    node.size = Math.min(Math.max(5, connections * 2), 30);
+
+  nodes.forEach((node) => {
+    const connections = degree.get(node.id) || 1;
+    node.size = Math.min(Math.max(6, connections * 2), 30);
   });
-  
+
   return {
     nodes: Array.from(nodes.values()),
-    links
+    links,
   };
 }

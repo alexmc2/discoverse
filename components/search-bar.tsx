@@ -11,14 +11,20 @@ import { Input } from '@/components/ui/input';
 interface SearchBarProps {
   onSearch: (artist: string) => void;
   isLoading?: boolean;
+  resetSignal?: number; // ← NEW
 }
 
-export default function SearchBar({ onSearch, isLoading }: SearchBarProps) {
+export default function SearchBar({
+  onSearch,
+  isLoading,
+  resetSignal,
+}: SearchBarProps) {
   const [query, setQuery] = useState('');
   const [suggestions, setSuggestions] = useState<Artist[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(-1);
   const searchRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   const debounceRef = useRef<NodeJS.Timeout | undefined>(undefined);
 
   useEffect(() => {
@@ -30,6 +36,16 @@ export default function SearchBar({ onSearch, isLoading }: SearchBarProps) {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  // Clear & collapse on reset
+  useEffect(() => {
+    if (resetSignal === undefined) return;
+    setQuery('');
+    setSuggestions([]);
+    setSelectedIndex(-1);
+    setShowSuggestions(false);
+    inputRef.current?.blur();
+  }, [resetSignal]);
 
   useEffect(() => {
     if (query.length < 2) {
@@ -63,6 +79,7 @@ export default function SearchBar({ onSearch, isLoading }: SearchBarProps) {
     if (query.trim()) {
       onSearch(query.trim());
       setShowSuggestions(false);
+      inputRef.current?.blur(); // collapse
     }
   };
 
@@ -71,6 +88,7 @@ export default function SearchBar({ onSearch, isLoading }: SearchBarProps) {
     onSearch(artist.name);
     setShowSuggestions(false);
     setSelectedIndex(-1);
+    inputRef.current?.blur(); // collapse
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -98,16 +116,17 @@ export default function SearchBar({ onSearch, isLoading }: SearchBarProps) {
       case 'Escape':
         setShowSuggestions(false);
         setSelectedIndex(-1);
+        inputRef.current?.blur();
         break;
     }
   };
 
   return (
-    // Fill the wrapper — no extra max-w here
     <div ref={searchRef} className="relative w-full">
       <form onSubmit={handleSubmit} className="relative">
         <div className="relative flex items-center">
           <Input
+            ref={inputRef}
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
@@ -126,8 +145,11 @@ export default function SearchBar({ onSearch, isLoading }: SearchBarProps) {
               onClick={() => {
                 setQuery('');
                 setSuggestions([]);
+                setSelectedIndex(-1);
+                setShowSuggestions(false);
+                inputRef.current?.focus();
               }}
-              className="absolute right-3 p-1 text-gray-500 hover:text-white transition-colors"
+              className="absolute right-3 p-1 text-gray-500 hover:text-white transition-colors cursor-pointer"
             >
               <X className="w-4 h-4" />
             </button>
@@ -150,9 +172,9 @@ export default function SearchBar({ onSearch, isLoading }: SearchBarProps) {
                   key={artist.id}
                   onClick={() => handleSelectSuggestion(artist)}
                   onMouseEnter={() => setSelectedIndex(index)}
-                  className={`w-full px-4 py-3 flex items-center gap-3 transition-colors text-left ${
+                  className={`w-full px-4 py-3 flex items-center gap-3 transition-colors text-left cursor-pointer ${
                     index === selectedIndex
-                      ? 'bg-gradient-to-r from-sky-900/30 via-blue-900/30 to-indigo-900/30'
+                      ? 'bg-gradient-to-r from-sky-900/30 via-blue-900/30 to-indigo-900/30 '
                       : 'hover:bg-gradient-to-r hover:from-sky-900/20 hover:via-blue-900/20 hover:to-indigo-900/20'
                   }`}
                 >

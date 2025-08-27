@@ -1,393 +1,380 @@
-// components/music-map-app.tsx
 'use client';
 
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState, useTransition } from 'react';
 import dynamic from 'next/dynamic';
-import { AnimatePresence } from 'framer-motion';
-import ArtistPanel from '@/components/artist-panel';
+import { useRouter } from 'next/navigation';
 import LoadingScreen from '@/components/loading-screen';
 import Header from '@/components/ui/header';
 import DefaultContent from '@/components/default-content';
 import ModeToggle from '@/components/ui/mode-toggle';
 import Legend from '@/components/ui/legend';
-import { buildGraphData, GraphNode, GraphLink } from '@/lib/lastfm';
+import ArtistPanel from '@/components/artist-panel';
+import type { GraphNode, GraphLink } from '@/lib/lastfm';
+import {
+  buildGraphData,
+  getArtistInfo,
+  getTopTracks as getLastFmTopTracks,
+} from '@/lib/lastfm';
+import {
+  getArtistImage,
+  getArtistTopTracks,
+  getArtistSpotifyUrl,
+} from '@/lib/spotify';
+
+type TrackSource = 'spotify' | 'lastfm' | null;
+
+interface PanelData {
+  artist: {
+    name: string;
+    url: string;
+    image?: string;
+    listeners: number;
+    playcount: number;
+    bio?: string;
+    tags: string[];
+    spotifyUrl?: string;
+  } | null;
+  tracks: Array<{
+    id: string;
+    name: string;
+    preview_url: string | null;
+    duration_ms: number;
+    popularity: number;
+    album: { name: string; images: Array<{ url: string }> };
+    artists: Array<{ name: string }>;
+  }>;
+  trackSource: TrackSource;
+}
+
+interface GraphData {
+  nodes: GraphNode[];
+  links: GraphLink[];
+}
 
 const MusicGraph = dynamic(() => import('@/components/music-graph'), {
   ssr: false,
   loading: () => <LoadingScreen message="Initializing graph engine..." />,
 });
 
-interface GraphData {
-  nodes: GraphNode[]; // we may store extra props on nodes (e.g., baseSize), TS allows excess properties
-  links: GraphLink[];
+function mergeGraphs(base: GraphData, incoming: GraphData): GraphData {
+  const nodeMap = new Map<string, GraphNode>();
+  const linkKey = (l: GraphLink) => `${l.source}→${l.target}`;
+  for (const n of base.nodes) nodeMap.set(n.id, n);
+  const linksMap = new Map<string, GraphLink>();
+  for (const l of base.links) linksMap.set(linkKey(l), l);
+  for (const n of incoming.nodes) {
+    const prev = nodeMap.get(n.id);
+    nodeMap.set(
+      n.id,
+      prev
+        ? {
+            ...prev,
+            image: prev.image || n.image,
+            tags: prev.tags?.length ? prev.tags : n.tags,
+            size: Math.max(prev.size ?? 6, n.size ?? 6),
+            group: prev.group || n.group,
+            depth: Math.min(prev.depth ?? 99, n.depth ?? 99),
+          }
+        : n
+    );
+  }
+  for (const l of incoming.links) linksMap.set(linkKey(l), l);
+  return {
+    nodes: Array.from(nodeMap.values()),
+    links: Array.from(linksMap.values()),
+  };
 }
 
-const STORAGE_KEYS = {
-  GRAPH_DATA: 'musicMap_graphData',
-  HAS_SEARCHED: 'musicMap_hasSearched',
-  SELECTED_ARTIST: 'musicMap_selectedArtist',
-  MODE: 'musicMap_mode',
-};
+async function fetchPanelDataClient(artistName: string): Promise<PanelData> {
+  const [info, spotifyImg, spotifyUrl] = await Promise.all([
+    getArtistInfo(artistName),
+    getArtistImage(artistName),
+    getArtistSpotifyUrl(artistName),
+  ]);
+  const artist = info
+    ? { ...info, image: spotifyImg || info.image, spotifyUrl }
+    : null;
 
-export default function MusicMapApp() {
-  const [graphData, setGraphData] = useState<GraphData>({
-    nodes: [],
-    links: [],
-  });
-  const [loading, setLoading] = useState(false);
-  const [selectedArtist, setSelectedArtist] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [hasSearched, setHasSearched] = useState(false);
-  const [isHydrated, setIsHydrated] = useState(false);
-  const [mode, setMode] = useState<'map' | 'info'>('info');
-  const [centerNodeName, setCenterNodeName] = useState<string | null>(null);
+  let tracks: PanelData['tracks'] = [];
+  let trackSource: TrackSource = null;
 
-  const expansionCache = useRef<Map<string, GraphData>>(new Map());
-
-  // ---------- helpers: merge + recenter/rescale ----------
-
-  // Ensure each node has a stable baseSize to scale from (so sizes don’t compound)
-  const ensureBaseSize = useCallback((g: GraphData): GraphData => {
-    return {
-      nodes: g.nodes.map((n) => {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const base = (n as any).baseSize ?? n.size ?? 10;
-        return { ...n, baseSize: base } as GraphNode & { baseSize: number };
-      }),
-      links: g.links.slice(),
-    };
-  }, []);
-
-  // Merge two graphs without dupes
-  const mergeGraphData = useCallback(
-    (base: GraphData, incoming: GraphData): GraphData => {
-      const nodeById = new Map(base.nodes.map((n) => [n.id, n] as const));
-      const nodes: GraphNode[] = [...base.nodes];
-
-      for (const n of incoming.nodes) {
-        if (!nodeById.has(n.id)) {
-          nodeById.set(n.id, n);
-          nodes.push(n);
-        }
-      }
-
-      const linkKey = (l: GraphLink) =>
-        `${
-          typeof l.source === 'string'
-            ? l.source
-            : (l.source as unknown as string)
-        }-${
-          typeof l.target === 'string'
-            ? l.target
-            : (l.target as unknown as string)
-        }`;
-      const existingLinks = new Set(base.links.map(linkKey));
-      const links: GraphLink[] = [...base.links];
-
-      for (const l of incoming.links) {
-        const k = linkKey(l);
-        if (!existingLinks.has(k)) {
-          existingLinks.add(k);
-          links.push(l);
-        }
-      }
-      return { nodes, links };
-    },
-    []
-  );
-
-  // Recompute depth (BFS distance) from new center and rescale size from baseSize
-  const recomputeFromCenter = useCallback(
-    (g: GraphData, centerName: string): GraphData => {
-      const nodes = g.nodes.map((n) => ({ ...n })); // shallow copy to keep state immutable
-      const links = g.links.slice();
-
-      const idByName = new Map(
-        nodes.map((n) => [n.name.toLowerCase(), n.id] as const)
-      );
-      const centerId = idByName.get(centerName.toLowerCase());
-      if (!centerId) return g; // nothing to do if we somehow don’t have that node
-
-      // Build undirected adjacency from current links
-      const adj = new Map<string, Set<string>>();
-      for (const l of links) {
-        const s =
-          typeof l.source === 'string'
-            ? l.source
-            : (l.source as unknown as string);
-        const t =
-          typeof l.target === 'string'
-            ? l.target
-            : (l.target as unknown as string);
-        if (!adj.has(s)) adj.set(s, new Set());
-        if (!adj.has(t)) adj.set(t, new Set());
-        adj.get(s)!.add(t);
-        adj.get(t)!.add(s);
-      }
-
-      // BFS distances from center
-      const dist = new Map<string, number>();
-      const q: string[] = [centerId];
-      dist.set(centerId, 0);
-      while (q.length) {
-        const u = q.shift()!;
-        const du = dist.get(u)!;
-        const nbrs = adj.get(u);
-        if (!nbrs) continue;
-        for (const v of nbrs) {
-          if (!dist.has(v)) {
-            dist.set(v, du + 1);
-            q.push(v);
-          }
-        }
-      }
-
-      // Size mapping: scale down with distance; boost center a bit.
-      // You can tune these constants for your taste.
-      const clamp = (v: number, lo: number, hi: number) =>
-        Math.max(lo, Math.min(hi, v));
-      const MAX_DEPTH_FOR_SIZE = 6;
-      const FAR_SIZE_FLOOR = 6; // minimum radius for very distant nodes
-      const CENTER_BOOST = 1.6; // how much bigger the center appears
-      const NEIGHBOR_BOOST = 1.15; // depth=1
-      const DECAY = 0.85; // exponential decay per extra hop (depth>=2)
-
-      for (const n of nodes) {
-        const d = dist.get(n.id);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const base = (n as any).baseSize ?? n.size ?? 10;
-
-        if (d === 0) {
-          n.depth = 0;
-          n.size = clamp(Math.round(base * CENTER_BOOST), FAR_SIZE_FLOOR, 28);
-        } else if (d === 1) {
-          n.depth = 1;
-          n.size = clamp(Math.round(base * NEIGHBOR_BOOST), FAR_SIZE_FLOOR, 24);
-        } else if (typeof d === 'number') {
-          const k = Math.pow(DECAY, Math.min(d, MAX_DEPTH_FOR_SIZE));
-          n.depth = d;
-          n.size = clamp(Math.round(base * k), FAR_SIZE_FLOOR, 22);
-        } else {
-          // disconnected from the new center; treat as "far"
-          n.depth = MAX_DEPTH_FOR_SIZE + 1;
-          n.size = FAR_SIZE_FLOOR;
-        }
-      }
-
-      return { nodes, links };
-    },
-    []
-  );
-
-  // ---------- load from localStorage ----------
-  useEffect(() => {
-    const storedGraphData = localStorage.getItem(STORAGE_KEYS.GRAPH_DATA);
-    const storedHasSearched = localStorage.getItem(STORAGE_KEYS.HAS_SEARCHED);
-    const storedSelectedArtist = localStorage.getItem(
-      STORAGE_KEYS.SELECTED_ARTIST
-    );
-    const storedMode = localStorage.getItem(STORAGE_KEYS.MODE) as
-      | 'map'
-      | 'info'
-      | null;
-
-    if (storedGraphData) {
-      try {
-        setGraphData(JSON.parse(storedGraphData));
-      } catch (e) {
-        console.error('Failed to parse stored graph data:', e);
-      }
+  try {
+    const spotifyTop = await getArtistTopTracks(artistName);
+    if (spotifyTop?.length) {
+      tracks = spotifyTop.slice(0, 10);
+      trackSource = 'spotify';
+    } else {
+      const lastFmTracks = await getLastFmTopTracks(artistName, 10);
+      tracks = lastFmTracks.map((t, idx) => ({
+        id: `${artistName}-${t.name}-${idx}`,
+        name: t.name,
+        preview_url: null,
+        duration_ms: 0,
+        popularity: 0,
+        album: { name: '—', images: [] },
+        artists: [{ name: t.artist }],
+      }));
+      trackSource = 'lastfm';
     }
-    if (storedHasSearched === 'true') setHasSearched(true);
-    if (storedSelectedArtist && storedSelectedArtist !== 'null')
-      setSelectedArtist(storedSelectedArtist);
-    if (storedMode === 'map' || storedMode === 'info') setMode(storedMode);
-    setIsHydrated(true);
+  } catch {
+    /* noop */
+  }
+
+  return { artist, tracks, trackSource };
+}
+
+export default function MusicMapApp({
+  seedArtist,
+  initialGraphData,
+  panelData,
+  randomArtists,
+}: {
+  seedArtist: string | null;
+  initialGraphData: GraphData | null;
+  panelData: PanelData | null;
+  randomArtists: string[];
+}) {
+  const router = useRouter();
+
+  const [mode, setMode] = useState<'map' | 'info'>('info');
+
+  const [isPending, startTransition] = useTransition();
+  const [showOverlay, setShowOverlay] = useState(false);
+  const pendingRef = useRef(false);
+
+  useEffect(() => {
+    if (isPending && !pendingRef.current) {
+      pendingRef.current = true;
+      setShowOverlay(true);
+    }
+    if (!isPending && pendingRef.current) {
+      pendingRef.current = false;
+      const t = setTimeout(() => setShowOverlay(false), 150);
+      return () => clearTimeout(t);
+    }
+  }, [isPending]);
+
+  const [graph, setGraph] = useState<GraphData>({ nodes: [], links: [] });
+  const firstLoadRef = useRef(true);
+
+  useEffect(() => {
+    if (!initialGraphData) return;
+    setGraph((prev) =>
+      firstLoadRef.current || prev.nodes.length === 0
+        ? initialGraphData
+        : mergeGraphs(prev, initialGraphData)
+    );
+    if (firstLoadRef.current) firstLoadRef.current = false;
+  }, [initialGraphData]);
+
+  const hasSearchedFromUrl = !!seedArtist;
+  const hasData = graph.nodes.length > 0;
+
+  const [centerNodeName, setCenterNodeName] = useState<string | null>(
+    seedArtist ?? null
+  );
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    const focus = params.get('focus');
+    setCenterNodeName(focus || seedArtist || null);
+  }, [seedArtist]);
+
+  // Panel state
+  const [panelOpen, setPanelOpen] = useState(false);
+  const [activePanelArtist, setActivePanelArtist] = useState<string | null>(
+    null
+  );
+  const [clientPanelData, setClientPanelData] = useState<PanelData | null>(
+    null
+  );
+
+  useEffect(() => {
+    if (
+      panelOpen &&
+      activePanelArtist &&
+      activePanelArtist === seedArtist &&
+      panelData
+    ) {
+      setClientPanelData(panelData);
+    }
+  }, [panelOpen, activePanelArtist, seedArtist, panelData]);
+
+  const [isExpanding, setIsExpanding] = useState(false);
+  const expandTokenRef = useRef(0);
+
+  const setUrlFocus = useCallback((focus: string | null) => {
+    if (typeof window === 'undefined') return;
+    const url = new URL(window.location.href);
+    if (focus && focus.trim()) url.searchParams.set('focus', focus);
+    else url.searchParams.delete('focus');
+    window.history.replaceState({}, '', url.toString());
   }, []);
 
-  useEffect(() => {
-    if (isHydrated)
-      localStorage.setItem(STORAGE_KEYS.GRAPH_DATA, JSON.stringify(graphData));
-  }, [graphData, isHydrated]);
+  const clearAllQueryParams = useCallback(() => {
+    if (typeof window === 'undefined') return;
+    const { origin, pathname } = window.location;
+    window.history.replaceState({}, '', `${origin}${pathname}`);
+  }, []);
 
-  useEffect(() => {
-    if (isHydrated)
-      localStorage.setItem(STORAGE_KEYS.HAS_SEARCHED, String(hasSearched));
-  }, [hasSearched, isHydrated]);
+  const [resetSignal, setResetSignal] = useState(0);
+  const [recenterSignal, setRecenterSignal] = useState(0);
 
-  useEffect(() => {
-    if (isHydrated)
-      localStorage.setItem(
-        STORAGE_KEYS.SELECTED_ARTIST,
-        String(selectedArtist)
-      );
-  }, [selectedArtist, isHydrated]);
+  const startNewSearch = useCallback(
+    (artistName: string) => {
+      setPanelOpen(false);
+      setActivePanelArtist(null);
+      setClientPanelData(null);
+      setGraph({ nodes: [], links: [] });
+      firstLoadRef.current = true;
+      setCenterNodeName(null);
+      setUrlFocus(null);
+      clearAllQueryParams();
+      setResetSignal((s) => s + 1);
 
-  useEffect(() => {
-    if (isHydrated) localStorage.setItem(STORAGE_KEYS.MODE, mode);
-  }, [mode, isHydrated]);
-
-  // ---------- actions ----------
-
-  const handleSearch = useCallback(
-    async (artistName: string) => {
-      setLoading(true);
-      setError(null);
-      setHasSearched(true);
-      try {
-        const raw = await buildGraphData(artistName);
-        if (raw.nodes.length === 0) {
-          setError(
-            `No data found for "${artistName}". Please try another artist.`
-          );
-          setGraphData({ nodes: [], links: [] });
-        } else {
-          const withBase = ensureBaseSize(raw);
-          const recentered = recomputeFromCenter(withBase, artistName);
-          setGraphData(recentered);
-          setSelectedArtist(null);
-          setCenterNodeName(artistName);
-          expansionCache.current.set(artistName.toLowerCase(), withBase);
-        }
-      } catch (err) {
-        console.error('Search error:', err);
-        setError(
-          'Failed to load artist data. Please check your API key or try again.'
-        );
-        setGraphData({ nodes: [], links: [] });
-      } finally {
-        setLoading(false);
-      }
+      startTransition(() => {
+        const trimmed = artistName?.trim();
+        if (trimmed) router.replace(`/?q=${encodeURIComponent(trimmed)}`);
+        else router.replace(`/`);
+      });
     },
-    [ensureBaseSize, recomputeFromCenter]
+    [router, setUrlFocus, clearAllQueryParams]
   );
 
-  const expandFromArtist = useCallback(
+  const expandFrom = useCallback(
     async (artistName: string) => {
-      const key = artistName.toLowerCase();
-      let data = expansionCache.current.get(key);
-
-      setLoading(true);
-      setError(null);
-      setHasSearched(true);
-
+      setIsExpanding(true);
+      const token = ++expandTokenRef.current;
       try {
-        if (!data) {
-          data = await buildGraphData(artistName);
-          if (data.nodes.length === 0) {
-            setLoading(false);
-            return;
-          }
-          data = ensureBaseSize(data);
-          expansionCache.current.set(key, data);
-        }
-
-        setGraphData((prev) => {
-          const merged = mergeGraphData(prev, data!);
-          const withBase = ensureBaseSize(merged);
-          return recomputeFromCenter(withBase, artistName);
-        });
-
-        setSelectedArtist(null);
+        const incoming = await buildGraphData(artistName, 2);
+        if (expandTokenRef.current !== token) return;
+        setGraph((prev) => mergeGraphs(prev, incoming));
         setCenterNodeName(artistName);
-      } catch (err) {
-        console.error('Expand error:', err);
-        setError('Failed to expand from artist.');
+        setUrlFocus(artistName);
+      } catch {
+        /* noop */
       } finally {
-        setLoading(false);
+        if (expandTokenRef.current === token) setIsExpanding(false);
       }
     },
-    [ensureBaseSize, mergeGraphData, recomputeFromCenter]
+    [setUrlFocus]
   );
+
+  const onClearData = useCallback(() => {
+    setGraph({ nodes: [], links: [] });
+    setPanelOpen(false);
+    setActivePanelArtist(null);
+    setClientPanelData(null);
+    firstLoadRef.current = true;
+    setCenterNodeName(null);
+    setUrlFocus(null);
+    clearAllQueryParams();
+    setResetSignal((s) => s + 1);
+
+    startTransition(() => {
+      router.replace('/');
+    });
+  }, [router, setUrlFocus, clearAllQueryParams]);
 
   const handleNodeClick = useCallback(
     (node: GraphNode) => {
       if (mode === 'map') {
-        // Expand and re-center on the clicked node, keeping existing graph
-        expandFromArtist(node.name);
+        expandFrom(node.name);
       } else {
-        setSelectedArtist(node.name);
+        setPanelOpen(true);
+        setActivePanelArtist(node.name);
+        setClientPanelData(null);
+        fetchPanelDataClient(node.name)
+          .then((data) => setClientPanelData(data))
+          .catch(() =>
+            setClientPanelData({ artist: null, tracks: [], trackSource: null })
+          );
       }
     },
-    [mode, expandFromArtist]
+    [mode, expandFrom]
   );
 
   const handleExpandFromPanel = useCallback(
     (artistName: string) => {
-      setSelectedArtist(null);
-      expandFromArtist(artistName);
+      expandFrom(artistName);
     },
-    [expandFromArtist]
+    [expandFrom]
   );
 
-  const handleClearData = useCallback(() => {
-    setGraphData({ nodes: [], links: [] });
-    setHasSearched(false);
-    setSelectedArtist(null);
-    setError(null);
-    setCenterNodeName(null);
-    localStorage.removeItem(STORAGE_KEYS.GRAPH_DATA);
-    localStorage.removeItem(STORAGE_KEYS.HAS_SEARCHED);
-    localStorage.removeItem(STORAGE_KEYS.SELECTED_ARTIST);
+  const handleClosePanel = useCallback(() => {
+    setPanelOpen(false);
+    setActivePanelArtist(null);
+    setClientPanelData(null);
   }, []);
 
-  const hasData = graphData.nodes.length > 0;
+  const overlayMessage = isExpanding ? 'Mapping connections...' : undefined;
+  const showAnyOverlay = isExpanding || showOverlay;
+
+  const showDefault = !hasSearchedFromUrl || !hasData;
 
   return (
-    <div
-      className="min-h-screen bg-gradient-to-br from-sky-950/10 via-blue-900/10 to-indigo-950/10 relative overflow-hidden"
-      style={{ overflow: 'hidden' }}
-    >
+    <div className="min-h-screen bg-gradient-to-br from-sky-950/10 via-blue-900/10 to-indigo-950/10 relative overflow-hidden">
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-sky-900/20 via-blue-900/20 to-indigo-900/20" />
 
-      {!loading && (
-        <Header
-          onSearch={handleSearch}
-          isLoading={loading}
-          hasSearched={hasSearched}
-          hasData={hasData}
-          onClearData={handleClearData}
-          error={error}
-          mode={mode}
-          onModeChange={setMode}
-        />
-      )}
+      <Header
+        onSearch={startNewSearch}
+        isLoading={isPending || showAnyOverlay}
+        hasSearched={hasSearchedFromUrl}
+        hasData={hasData}
+        onClearData={onClearData}
+        error={null}
+        mode={mode}
+        onModeChange={setMode}
+        resetSignal={resetSignal}
+        // NEW — pass recenter controls to place the button under the search
+        showRecenter={hasSearchedFromUrl}
+        canRecenter={!!centerNodeName}
+        onRecenter={() => setRecenterSignal((s) => s + 1)}
+      />
 
       <div
         className="fixed inset-0"
-        style={{ paddingTop: !hasSearched ? '180px' : '0' }}
+        style={{ paddingTop: showDefault ? '180px' : '0' }}
       >
-        {!hasSearched ? (
-          <DefaultContent onSearch={handleSearch} />
+        {showDefault ? (
+          <DefaultContent
+            onSearch={startNewSearch}
+            randomArtists={randomArtists}
+          />
         ) : (
-          <>
-            <AnimatePresence>{loading && <LoadingScreen />}</AnimatePresence>
-            {hasData && (
-              <div className="fixed inset-0 overflow-hidden">
-                <MusicGraph
-                  data={graphData}
-                  onNodeClick={handleNodeClick}
-                  selectedNode={selectedArtist}
-                  centerNodeName={centerNodeName}
-                />
-              </div>
-            )}
-          </>
+          <div className="fixed inset-0 overflow-hidden">
+            <MusicGraph
+              data={graph}
+              onNodeClick={handleNodeClick}
+              selectedNode={null}
+              centerNodeName={centerNodeName}
+              recenterSignal={recenterSignal}
+            />
+          </div>
         )}
       </div>
 
-      {hasSearched && hasData && !loading && (
-        <div className="fixed sm:left-4 left-4 sm:bottom-4 bottom-2 z-40 flex flex-col gap-2">
+      {/* Keep Legend + Mode toggle in their fixed positions */}
+      {hasSearchedFromUrl && hasData && (
+        <>
           <Legend />
           <ModeToggle mode={mode} onModeChange={setMode} />
-        </div>
+        </>
       )}
 
-      <ArtistPanel
-        artistName={selectedArtist}
-        onClose={() => setSelectedArtist(null)}
-        onExpand={handleExpandFromPanel}
-      />
+      {panelOpen && (
+        <ArtistPanel
+          artistName={activePanelArtist}
+          artist={clientPanelData?.artist ?? null}
+          tracks={clientPanelData?.tracks ?? []}
+          trackSource={clientPanelData?.trackSource ?? null}
+          onClose={handleClosePanel}
+          onExpand={handleExpandFromPanel}
+        />
+      )}
+
+      {showAnyOverlay && <LoadingScreen message={overlayMessage} />}
     </div>
   );
 }
