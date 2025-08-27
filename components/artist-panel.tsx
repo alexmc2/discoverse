@@ -424,7 +424,11 @@ export default function ArtistPanel({
                                   canPlay
                                     ? isThisPlaying
                                       ? 'Pause preview'
-                                      : 'Play preview'
+                                      : track.preview_url?.includes(
+                                          'deezer.com'
+                                        )
+                                      ? 'Play 30s preview (Deezer)'
+                                      : 'Play 30s preview (Spotify)'
                                     : trackSource === 'lastfm'
                                     ? 'Preview unavailable (Last.fm)'
                                     : 'Preview unavailable'
