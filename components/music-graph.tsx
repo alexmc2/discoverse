@@ -328,16 +328,29 @@ export default function MusicGraph({
         node.image.startsWith('http') &&
         (isHovered || node.depth === 0 || isCenter || globalScale > 1.5)
       ) {
+        // inside music-graph.tsx when creating the image
         let img = imageCache.get(node.id);
         if (!img) {
-          img = new Image();
-          img.crossOrigin = 'anonymous';
-          img.src = node.image;
-          imageCache.set(node.id, img);
-          img.onload = () => {
+          const attempt = new Image();
+          attempt.crossOrigin = 'anonymous';
+          attempt.src = node.image!;
+          imageCache.set(node.id, attempt);
+
+          attempt.onload = () => {
             forceUpdate({});
           };
+          attempt.onerror = () => {
+            const retry = new Image();
+            retry.src = node.image!;
+            imageCache.set(node.id, retry);
+            retry.onload = () => {
+              forceUpdate({});
+            };
+          };
+
+          img = attempt;
         }
+
         if (img.complete && img.naturalWidth > 0) {
           const imgRadius =
             (isCenter ? IMAGE_FACTOR_CENTER : IMAGE_FACTOR_DEFAULT) * drawSize;
