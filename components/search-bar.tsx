@@ -115,7 +115,7 @@ export default function SearchBar({ onSearch, isLoading }: SearchBarProps) {
             onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
             placeholder="Search for an artist or band..."
             disabled={isLoading}
-            className="w-full h-12 pl-12 pr-10 bg-gray-900/90 backdrop-blur-xl border-gray-800 text-white placeholder-gray-500 focus:border-sky-500"
+            className="w-full sm:h-11 h-10 pl-12 pr-10 bg-slate-800 text-white backdrop-blur-xl border-gray-800 placeholder-gray-500 focus:border-sky-800"
           />
 
           <Search className="absolute left-4 w-5 h-5 text-gray-500" />
@@ -172,7 +172,9 @@ export default function SearchBar({ onSearch, isLoading }: SearchBarProps) {
                     </div>
                   )}
                   <div className="flex-1">
-                    <div className="text-white font-medium cursor-pointer">{artist.name}</div>
+                    <div className="text-white font-medium cursor-pointer">
+                      {artist.name}
+                    </div>
                   </div>
                 </button>
               ))}

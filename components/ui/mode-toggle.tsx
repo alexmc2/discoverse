@@ -64,7 +64,7 @@ export default function ModeToggle({
               </button>
             </TooltipTrigger>
             <TooltipContent className="bg-gray-900 text-white border border-gray-700">
-              <p>Click artist image to map connections</p>
+              <p>Click artist image to map more connections</p>
             </TooltipContent>
           </Tooltip>
         </div>

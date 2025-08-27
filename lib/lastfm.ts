@@ -153,6 +153,37 @@ export async function getArtistInfo(artistName: string) {
   }
 }
 
+export interface Track {
+  name: string;
+  playcount: number;
+  url: string;
+  artist: string;
+}
+
+export async function getTopTracks(artistName: string, limit: number = 10): Promise<Track[]> {
+  const url = `${BASE_URL}?method=artist.gettoptracks&artist=${encodeURIComponent(artistName)}&limit=${limit}`;
+  
+  try {
+    const data = await fetchWithCache(url);
+    const tracks = data?.toptracks?.track || [];
+    
+    return tracks.map((track: { 
+      name: string; 
+      playcount: string; 
+      url: string;
+      artist: { name: string } 
+    }) => ({
+      name: track.name,
+      playcount: parseInt(track.playcount || '0'),
+      url: track.url,
+      artist: track.artist?.name || artistName
+    }));
+  } catch (error) {
+    console.error('Top tracks error:', error);
+    return [];
+  }
+}
+
 export async function buildGraphData(seedArtist: string, depth: number = 2) {
   const nodes: Map<string, GraphNode> = new Map();
   const links: GraphLink[] = [];

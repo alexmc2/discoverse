@@ -377,7 +377,7 @@ export default function MusicMapApp() {
       </div>
 
       {hasSearched && hasData && !loading && (
-        <div className="fixed sm:left-4 left-2 sm:bottom-4 bottom-2 z-40 flex flex-col gap-2">
+        <div className="fixed sm:left-4 left-4 sm:bottom-4 bottom-2 z-40 flex flex-col gap-2">
           <Legend />
           <ModeToggle mode={mode} onModeChange={setMode} />
         </div>
