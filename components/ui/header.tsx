@@ -1,6 +1,6 @@
 'use client';
 
-import { Star, LocateFixed } from 'lucide-react';
+import { LocateFixed, AudioLines } from 'lucide-react';
 import SearchBar from '@/components/search-bar';
 
 interface HeaderProps {
@@ -38,9 +38,12 @@ export default function Header({
       <div className="w-full max-w-md">
         <div className="flex items-center gap-2 sm:pb-2 pb-3">
           <div className="sm:w-10 sm:h-10 w-8 h-8 rounded-lg flex items-center justify-center bg-gradient-to-br from-sky-600 via-blue-600 to-indigo-600">
-            <Star className="sm:w-6 w-5 h-5 sm:h-6 text-white" />
+            <AudioLines className="sm:w-6 w-5 h-5 sm:h-6 text-white" />
           </div>
-          <h1 className="text-3xl font-bold text-white">Discoverse</h1>
+          <h1 className="text-3xl font-bold text-white">
+            <span className="text-white font-bold">Discover</span>
+            <span className="text-white font-light">se</span>
+          </h1>
 
           {hasSearched && hasData && (
             <button
