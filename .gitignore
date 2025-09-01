@@ -45,3 +45,6 @@ next-env.d.ts
 .dev.vars
 # Generated Claude Code configurations
 .claude/
+
+/.open-next/
+/.wrangler/
