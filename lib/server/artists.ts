@@ -85,6 +85,7 @@ const POPULAR_ARTISTS_POOL = [
   'Depeche Mode',
   'Radiohead',
   'LCD Soundsystem',
+  'Fujiya & Miyagi',
   'Pink Floyd',
   'Suede',
   'Queen',

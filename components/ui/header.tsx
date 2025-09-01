@@ -1,3 +1,4 @@
+// components/ui/header.tsx
 'use client';
 
 import { LocateFixed, AudioLines } from 'lucide-react';

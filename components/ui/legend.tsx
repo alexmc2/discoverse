@@ -1,3 +1,4 @@
+// components/ui/legend.tsx
 'use client';
 
 import { useMemo, useState } from 'react';

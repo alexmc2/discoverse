@@ -4,7 +4,7 @@
 # It will add the comment or replace incorrect ones
 
 # Find all TypeScript and JavaScript files, excluding node_modules, .next, and .git directories
-find . -name "*.ts" -o -name "*.tsx" -o -name "*.js" -o -name "*.jsx" | grep -v "node_modules" | grep -v ".next" | grep -v ".git" | while read -r file; do
+find . -name "*.ts" -o -name "*.tsx" -o -name "*.js" -o -name "*.jsx" -o -name "*.mjs" | grep -v "node_modules" | grep -v ".next" | grep -v ".git" | while read -r file; do
   # Get the relative path
   relative_path=$(echo "$file" | sed 's|^\./||')
   

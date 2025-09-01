@@ -1,13 +1,8 @@
 // lib/spotify.ts
 // Spotify Web API integration + robust previews with iTunes fallback.
-// Safe for both client AND server environments.
+// Safe for both client AND server environments (Node + CF Workers).
 
-interface SpotifyToken {
-  access_token: string;
-  token_type: string;
-  expires_in: number;
-}
-
+/** ====== Spotify types ====== */
 interface SpotifyArtistImage {
   url: string;
   height: number;
@@ -55,24 +50,44 @@ interface SpotifyTopTracksResponse {
   tracks: SpotifyTrack[];
 }
 
-// iTunes types (subset)
-interface ITunesResult {
-  artistName: string;
-  trackName: string;
-  previewUrl?: string; // 30s MP3/AAC
+interface SpotifyToken {
+  access_token: string;
+  token_type: string;
+  expires_in: number;
 }
 
-interface ITunesSearchResponse {
-  resultCount: number;
-  results: ITunesResult[];
+/** ====== Small concurrency gate (Miniflare can drop sockets if bursty) ====== */
+const FORCE_CLIENT =
+  process.env.NEXT_PUBLIC_FORCE_CLIENT_SPOTIFY === '1' ? true : false;
+const MAX_CONCURRENCY = 2; // keep low for local Workers; fine on real edge
+let active = 0;
+const waiters: Array<() => void> = [];
+
+async function withLimit<T>(fn: () => Promise<T>): Promise<T> {
+  if (active >= MAX_CONCURRENCY) {
+    await new Promise<void>((r) => waiters.push(r));
+  }
+  active++;
+  try {
+    return await fn();
+  } finally {
+    active--;
+    const next = waiters.shift();
+    if (next) next();
+  }
 }
 
-// ===== Token cache =====
+/** ====== Token cache + single-flight ====== */
 let cachedToken: { token: string; expires: number } | null = null;
+let tokenInFlight: Promise<string | null> | null = null;
+
+function isServer() {
+  return typeof window === 'undefined';
+}
 
 function resolveUrl(path: string): string {
   if (/^https?:\/\//i.test(path)) return path;
-  if (typeof window !== 'undefined') return path;
+  if (!isServer()) return path;
 
   const explicit = process.env.NEXT_PUBLIC_SITE_URL;
   if (explicit) return explicit.replace(/\/$/, '') + path;
@@ -84,29 +99,110 @@ function resolveUrl(path: string): string {
   return `http://localhost:${port}${path}`;
 }
 
-async function getSpotifyToken(): Promise<string | null> {
-  if (cachedToken && Date.now() < cachedToken.expires) {
-    return cachedToken.token;
-  }
+async function fetchTokenDirect(): Promise<string | null> {
+  const id = process.env.SPOTIFY_CLIENT_ID;
+  const secret = process.env.SPOTIFY_CLIENT_SECRET;
+  if (!id || !secret) return null;
+
+  // Node has Buffer; Workers/browsers have btoa
+  const basic =
+    typeof Buffer !== 'undefined'
+      ? Buffer.from(`${id}:${secret}`).toString('base64')
+      : btoa(`${id}:${secret}`);
+
+  const res = await withLimit(() =>
+    fetch('https://accounts.spotify.com/api/token', {
+      method: 'POST',
+      headers: {
+        Authorization: `Basic ${basic}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: 'grant_type=client_credentials',
+    })
+  );
+
+  if (!res.ok) return null;
+
+  const data: SpotifyToken = await res.json();
+  cachedToken = {
+    token: data.access_token,
+    // refresh ~5 minutes early
+    expires: Date.now() + (data.expires_in - 300) * 1000,
+  };
+  return cachedToken.token;
+}
+
+async function fetchTokenViaRoute(): Promise<string | null> {
+  const url = resolveUrl('/api/spotify/token');
+  const res = await withLimit(() => fetch(url, { method: 'POST' }));
+  if (!res.ok) return null;
+
+  const data: SpotifyToken = await res.json();
+  cachedToken = {
+    token: data.access_token,
+    expires: Date.now() + (data.expires_in - 300) * 1000,
+  };
+  return cachedToken.token;
+}
+
+export async function getSpotifyToken(): Promise<string | null> {
+  // In local preview with Miniflare, avoid server-side Spotify calls entirely
+  if (isServer() && FORCE_CLIENT) return null;
+  if (cachedToken && Date.now() < cachedToken.expires) return cachedToken.token;
+  if (tokenInFlight) return tokenInFlight;
+
+  tokenInFlight = (async () => {
+    // Prefer direct token fetch on the server/Worker (avoids loopback)
+    if (isServer()) {
+      const direct = await fetchTokenDirect();
+      if (direct) return direct;
+    }
+    // Browser (and fallback): use the Next API route
+    return await fetchTokenViaRoute();
+  })();
+
   try {
-    const url = resolveUrl('/api/spotify/token');
-    const res = await fetch(url, { method: 'POST' });
-    if (res.status === 501) return null; // credentials not configured
-    if (!res.ok) throw new Error('Failed to get Spotify token');
-    const data: SpotifyToken = await res.json();
-    cachedToken = {
-      token: data.access_token,
-      // refresh ~5 minutes early
-      expires: Date.now() + (data.expires_in - 300) * 1000,
-    };
-    return cachedToken.token;
-  } catch (e) {
-    console.error('Error getting Spotify token:', e as Error);
+    return await tokenInFlight;
+  } finally {
+    tokenInFlight = null;
+  }
+}
+
+/** ====== Simple circuit breaker around Spotify fetches ====== */
+let consecutiveFailures = 0;
+let cooloffUntil = 0;
+
+function inCooloff() {
+  return Date.now() < cooloffUntil;
+}
+function noteFailure() {
+  consecutiveFailures++;
+  if (consecutiveFailures >= 3) {
+    // after 3 network errors, pause Spotify calls for 30s
+    cooloffUntil = Date.now() + 30_000;
+    consecutiveFailures = 0;
+  }
+}
+
+async function spotifyGET<T>(url: string, token: string): Promise<T | null> {
+  if (inCooloff()) return null;
+
+  try {
+    const res = await withLimit(() =>
+      fetch(url, { headers: { Authorization: `Bearer ${token}` } })
+    );
+    if (!res.ok) return null;
+
+    consecutiveFailures = 0; // success resets breaker
+    return (await res.json()) as T;
+  } catch {
+    // Miniflare often throws "Network connection lost" here
+    noteFailure();
     return null;
   }
 }
 
-// ===== Helpers =====
+/** ====== Market detection ====== */
 function detectMarketPriority(): string[] {
   let first: string | null = null;
   try {
@@ -122,31 +218,17 @@ function detectMarketPriority(): string[] {
   return defaults;
 }
 
-async function spotifyGET<T>(url: string, token: string): Promise<T | null> {
-  try {
-    const res = await fetch(url, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    if (!res.ok) {
-      console.warn('Spotify request failed', res.status, url);
-      return null;
-    }
-    return (await res.json()) as T;
-  } catch (e) {
-    console.error('Spotify fetch error', e);
-    return null;
-  }
-}
-
-// ===== Public: search + images + url =====
+/** ====== Public: search + images + url ====== */
 export async function searchSpotifyArtist(
   artistName: string
 ): Promise<SpotifyArtist | null> {
   const token = await getSpotifyToken();
   if (!token) return null;
+
   const url = `https://api.spotify.com/v1/search?q=${encodeURIComponent(
     artistName
   )}&type=artist&limit=1`;
+
   const data = await spotifyGET<SpotifySearchResponse>(url, token);
   return data?.artists.items?.[0] ?? null;
 }
@@ -154,6 +236,7 @@ export async function searchSpotifyArtist(
 export async function getArtistImage(
   artistName: string
 ): Promise<string | undefined> {
+  if (isServer() && FORCE_CLIENT) return undefined;
   try {
     const artist = await searchSpotifyArtist(artistName);
     if (artist && artist.images.length > 0) {
@@ -166,10 +249,10 @@ export async function getArtistImage(
   }
 }
 
-// NEW: exported and typed Spotify URL helper
 export async function getArtistSpotifyUrl(
   artistName: string
 ): Promise<string | undefined> {
+  if (isServer() && FORCE_CLIENT) return undefined;
   try {
     const artist = await searchSpotifyArtist(artistName);
     if (!artist) return undefined;
@@ -195,7 +278,17 @@ export async function getArtistImages(
   return imageMap;
 }
 
-// ===== iTunes fallback =====
+/** ====== iTunes fallback for previews ====== */
+interface ITunesResult {
+  artistName: string;
+  trackName: string;
+  previewUrl?: string;
+}
+interface ITunesSearchResponse {
+  resultCount: number;
+  results: ITunesResult[];
+}
+
 async function fetchITunesPreview(
   artist: string,
   track: string
@@ -204,7 +297,7 @@ async function fetchITunesPreview(
     const url = `https://itunes.apple.com/search?term=${encodeURIComponent(
       `${artist} ${track}`
     )}&media=music&entity=song&limit=5`;
-    const res = await fetch(url);
+    const res = await withLimit(() => fetch(url));
     if (!res.ok) return null;
     const data: ITunesSearchResponse = await res.json();
 
@@ -243,20 +336,19 @@ async function enrichWithITunesPreviews(
         t.artists[0]?.name ?? artistName,
         t.name
       );
-      if (candidate) {
-        t.preview_url = candidate;
-      }
+      if (candidate) t.preview_url = candidate;
     }
   }
 
   await Promise.all(Array.from({ length: concurrency }).map(() => worker()));
 }
 
-// ===== Public: top tracks with robust previews =====
+/** ====== Public: top tracks with robust previews ====== */
 export async function getArtistTopTracks(
   artistName: string,
   marketHint?: string
 ): Promise<SpotifyTrack[]> {
+  if (isServer() && FORCE_CLIENT) return [];
   const token = await getSpotifyToken();
   if (!token) return [];
 
@@ -278,6 +370,7 @@ export async function getArtistTopTracks(
   }
   if (!tracks.length) return [];
 
+  // Try alternate markets for previews if needed
   const hasAnyPreview = tracks.some((t) => !!t.preview_url);
   if (!hasAnyPreview) {
     for (const market of marketOrder) {
