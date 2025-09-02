@@ -17,25 +17,35 @@ export const metadata: Metadata = {
   metadataBase: new URL(
     process.env.NEXT_PUBLIC_SITE_URL || 'https://discoverse.co.uk'
   ),
-  title: 'Discoverse | Explore Artist Connections',
+  title: 'Discoverse | Music Discovery',
   description:
-    'Discover musical connections between artists in an interactive star map. Explore how your favorite artists relate through genres and influences.',
+    'Discover musical connections between artists in an interactive star map. See how artists connect through genres and influences — and listen to top tracks.',
   keywords:
     'music, artists, visualisation, graph, network, last.fm, music discovery',
   authors: [{ name: 'Music Map' }],
   openGraph: {
-    title: 'Discoverse | Explore Artist Connections',
+    title: 'Discoverse | Music Discovery',
     description:
-      'Discover musical connections between artists in an interactive star map.',
+      'See how artists connect through genres and influences in an interactive star map. Listen to top tracks.',
     type: 'website',
-    images: ['/opengraph-image'],
+    siteName: 'Discoverse',
+    locale: 'en_GB',
+    images: [
+      {
+        url: '/opengraph-image?v=1',
+        width: 1200,
+        height: 630,
+        type: 'image/png',
+        alt: 'Discoverse — Music Discovery',
+      },
+    ],
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Discoverse | Explore Artist Connections',
+    title: 'Discoverse | Music Discovery',
     description:
-      'See how artists connect through genres and influences in an interactive star map.',
-    images: ['/twitter-image'],
+      'See how artists connect through genres and influences — listen to top tracks.',
+    images: ['/twitter-image?v=1'],
   },
 };
 
