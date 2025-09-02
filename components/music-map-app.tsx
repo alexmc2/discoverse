@@ -285,6 +285,7 @@ export default function MusicMapApp({
   );
 
   const onClearData = useCallback(() => {
+    // Immediately return to default content without a route transition
     setGraph({ nodes: [], links: [] });
     setPanelOpen(false);
     setActivePanelArtist(null);
@@ -294,11 +295,7 @@ export default function MusicMapApp({
     setUrlFocus(null);
     clearAllQueryParams();
     setResetSignal((s) => s + 1);
-
-    startTransition(() => {
-      router.replace('/');
-    });
-  }, [router, setUrlFocus, clearAllQueryParams]);
+  }, [setUrlFocus, clearAllQueryParams]);
 
   const handleNodeClick = useCallback(
     (node: GraphNode) => {
@@ -354,8 +351,8 @@ export default function MusicMapApp({
         mode={mode}
         onModeChange={setMode}
         resetSignal={resetSignal}
-        // NEW — pass recenter controls to place the button under the search
-        showRecenter={hasSearchedFromUrl}
+        // Show recenter only when graph is visible
+        showRecenter={hasSearchedFromUrl && hasData}
         canRecenter={!!centerNodeName}
         onRecenter={() => setRecenterSignal((s) => s + 1)}
       />

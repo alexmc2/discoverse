@@ -46,39 +46,52 @@ export default function Header({
             <span className="text-white font-light">se</span>
           </h1>
 
+          {/* Right side of title row */}
+          <div className="ml-auto flex items-center gap-2">
+            {/* Mobile: recenter aligned with title */}
+            {showRecenter && (
+              <button
+                onClick={onRecenter}
+                disabled={!canRecenter}
+                aria-label="Re-centre on current artist"
+                title="Re-centre on current artist"
+                className="sm:hidden flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-sky-600 via-blue-600 to-indigo-600 text-white shadow-md hover:brightness-110 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                <LocateFixed className="h-4 w-4" />
+                <span className="sr-only">Re-centre on current artist</span>
+              </button>
+            )}
+
+            {/* Desktop: keep reset button in title row */}
+            {hasSearched && hasData && (
+              <button
+                onClick={onClearData}
+                className="hidden sm:inline-flex cursor-pointer px-4 py-2 bg-slate-800 text-gray-200 rounded-md text-sm transition-all duration-300 border border-gray-700 hover:text-white hover:bg-slate-900"
+              >
+                Reset Graph
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Search + mobile reset (mobile only shows the inline reset) */}
+        <div className="flex items-center gap-2 sm:block">
+          <div className="flex-1">
+            <SearchBar
+              onSearch={onSearch}
+              isLoading={isLoading}
+              resetSignal={resetSignal}
+            />
+          </div>
           {hasSearched && hasData && (
             <button
               onClick={onClearData}
-              className="cursor-pointer ml-auto px-4 py-2 bg-slate-800 text-gray-200 rounded-md text-sm transition-all duration-300 border border-gray-700 hover:text-white hover:bg-slate-900"
+              className="sm:hidden h-10 px-3 bg-slate-800 text-gray-200 rounded-md text-sm transition-all duration-300 border border-gray-700 hover:text-white hover:bg-slate-900 cursor-pointer"
             >
-              <span className="sm:hidden">Reset</span>
-              <span className="hidden sm:inline">Reset Graph</span>
+              Reset
             </button>
           )}
         </div>
-
-        {/* Search */}
-        <SearchBar
-          onSearch={onSearch}
-          isLoading={isLoading}
-          resetSignal={resetSignal}
-        />
-
-        {/* NEW: Recenter button directly underneath the search, left-aligned */}
-        {showRecenter && (
-          <div className="mt-2">
-            <button
-              onClick={onRecenter}
-              disabled={!canRecenter}
-              aria-label="Re-centre on current artist"
-              title="Re-centre on current artist"
-              className="flex sm:h-10 sm:w-10 h-9 w-9 items-center justify-center rounded-full border border-gray-700 bg-gray-800 backdrop-blur-md text-white shadow-md hover:bg-gray-800 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              <LocateFixed className="sm:h-5 sm:w-5 h-4 w-4" />
-              <span className="sr-only">Re-centre on current artist</span>
-            </button>
-          </div>
-        )}
 
         {error && (
           <div className="mt-4 p-4 bg-red-900/20 border border-red-800 rounded-lg text-red-300 text-center">
@@ -86,6 +99,22 @@ export default function Header({
           </div>
         )}
       </div>
+
+      {/* Desktop: Recenter at top-right of the screen with gradient styling */}
+      {showRecenter && (
+        <div className="hidden sm:flex absolute right-3 sm:right-4 top-3 sm:top-4">
+          <button
+            onClick={onRecenter}
+            disabled={!canRecenter}
+            aria-label="Re-centre on current artist"
+            title="Re-centre on current artist"
+            className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-sky-600 via-blue-600 to-indigo-600 text-white shadow-md hover:brightness-110 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            <LocateFixed className="h-5 w-5" />
+            <span className="sr-only">Re-centre on current artist</span>
+          </button>
+        </div>
+      )}
     </header>
   );
 }

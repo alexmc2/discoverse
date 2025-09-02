@@ -2,11 +2,9 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import Image from 'next/image';
-import { Search, X, Music } from 'lucide-react';
+import { Search, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { searchArtist, Artist } from '@/lib/lastfm';
-import { getArtistImage } from '@/lib/spotify';
 import { Input } from '@/components/ui/input';
 
 interface SearchBarProps {
@@ -57,16 +55,7 @@ export default function SearchBar({
 
     debounceRef.current = setTimeout(async () => {
       const results = await searchArtist(query);
-      const enhancedResults = await Promise.all(
-        results.map(async (artist) => {
-          if (!artist.image) {
-            const spotifyImage = await getArtistImage(artist.name);
-            return { ...artist, image: spotifyImage || artist.image };
-          }
-          return artist;
-        })
-      );
-      setSuggestions(enhancedResults);
+      setSuggestions(results);
       setShowSuggestions(true);
     }, 300);
 
@@ -173,32 +162,13 @@ export default function SearchBar({
                   key={artist.id}
                   onClick={() => handleSelectSuggestion(artist)}
                   onMouseEnter={() => setSelectedIndex(index)}
-                  className={`w-full px-4 py-3 flex items-center gap-3 transition-colors text-left cursor-pointer ${
+                  className={`w-full px-4 py-3 transition-colors text-left cursor-pointer ${
                     index === selectedIndex
                       ? 'bg-gradient-to-r from-sky-900/30 via-blue-900/30 to-indigo-900/30 '
                       : 'hover:bg-gradient-to-r hover:from-sky-900/20 hover:via-blue-900/20 hover:to-indigo-900/20'
                   }`}
                 >
-                  {artist.image ? (
-                    <div className="relative w-10 h-10">
-                      <Image
-                        src={artist.image}
-                        alt={artist.name}
-                        fill
-                        className="rounded-full object-cover"
-                        sizes="40px"
-                      />
-                    </div>
-                  ) : (
-                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-sky-600 via-blue-600 to-indigo-600 flex items-center justify-center">
-                      <Music className="w-5 h-5 text-white" />
-                    </div>
-                  )}
-                  <div className="flex-1">
-                    <div className="text-white font-medium cursor-pointer">
-                      {artist.name}
-                    </div>
-                  </div>
+                  <div className="text-white font-medium cursor-pointer">{artist.name}</div>
                 </button>
               ))}
             </div>
