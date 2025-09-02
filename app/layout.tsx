@@ -14,6 +14,9 @@ const interTight = Inter_Tight({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(
+    process.env.NEXT_PUBLIC_SITE_URL || 'https://discoverse.co.uk'
+  ),
   title: 'Discoverse | Explore Artist Connections',
   description:
     'Discover musical connections between artists in an interactive star map. Explore how your favorite artists relate through genres and influences.',
@@ -25,6 +28,14 @@ export const metadata: Metadata = {
     description:
       'Discover musical connections between artists in an interactive star map.',
     type: 'website',
+    images: ['/opengraph-image'],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Discoverse | Explore Artist Connections',
+    description:
+      'See how artists connect through genres and influences in an interactive star map.',
+    images: ['/twitter-image'],
   },
 };
 
