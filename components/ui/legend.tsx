@@ -10,7 +10,7 @@ export default function Legend() {
   const [open, setOpen] = useState(false);
 
   return (
-    <div className="fixed sm:left-4 left-2 sm:bottom-7 bottom-9 z-40 mb-8">
+    <div className="fixed sm:left-4 left-3 sm:bottom-7 bottom-5 z-40 mb-8">
       <Popover.Root open={open} onOpenChange={setOpen}>
         <Popover.Trigger asChild>
           <button

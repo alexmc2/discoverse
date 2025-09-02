@@ -24,7 +24,7 @@ export default function ModeToggle({
 
   return (
     <div
-      className={`fixed sm:left-4 left-2 sm:bottom-4 bottom-2 z-40 ${className}`}
+      className={`fixed sm:left-4 left-3 sm:bottom-4 bottom-3 z-40 ${className}`}
       role="region"
       aria-label="Mode toggle"
     >
@@ -70,13 +70,13 @@ export default function ModeToggle({
           </Tooltip>
         </div>
         {/* Mobile-only helper text since tooltips don't work well on touch devices */}
-        <div className="mt-1 sm:hidden text-xs leading-snug text-gray-400">
+        {/* <div className="mt-1 sm:hidden text-xs leading-snug text-gray-400">
           {mode === 'map' ? (
             <p>Click artist image to map more connections</p>
           ) : (
             <p>Click artist image to open info panel</p>
           )}
-        </div>
+        </div> */}
       </TooltipProvider>
     </div>
   );

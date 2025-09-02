@@ -10,6 +10,7 @@ import DefaultContent from '@/components/default-content';
 import ModeToggle from '@/components/ui/mode-toggle';
 import Legend from '@/components/ui/legend';
 import ArtistPanel from '@/components/artist-panel';
+import BuyMeACoffee from '@/components/ui/buy-me-a-coffee';
 import type { GraphNode, GraphLink } from '@/lib/lastfm';
 import {
   buildGraphData,
@@ -219,6 +220,14 @@ export default function MusicMapApp({
 
   const [graph, setGraph] = useState<GraphData>({ nodes: [], links: [] });
   const firstLoadRef = useRef(true);
+  const restoredFromCacheRef = useRef(false);
+  const storageVersion = 'v1';
+
+  // Helper: storage key per seed artist
+  const storageKey = (artist?: string | null) =>
+    artist && artist.trim()
+      ? `musicmap:${storageVersion}:graph:${artist.toLowerCase()}`
+      : null;
 
   useEffect(() => {
     if (!initialGraphData) return;
@@ -230,12 +239,40 @@ export default function MusicMapApp({
     if (firstLoadRef.current) firstLoadRef.current = false;
   }, [initialGraphData]);
 
-  // If SSR didn't provide initial graph, fetch it on the client to
-  // avoid Cloudflare Worker subrequest limits during SSR.
+  // Try to restore graph from sessionStorage before any client fetch.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    restoredFromCacheRef.current = false;
+    if (!seedArtist) return;
+    if (initialGraphData && initialGraphData.nodes.length) return;
+    try {
+      const key = storageKey(seedArtist);
+      if (!key) return;
+      const raw = sessionStorage.getItem(key);
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as Partial<GraphData> | null;
+      if (
+        parsed &&
+        Array.isArray(parsed.nodes) &&
+        Array.isArray(parsed.links)
+      ) {
+        setGraph({ nodes: parsed.nodes as GraphNode[], links: parsed.links as GraphLink[] });
+        restoredFromCacheRef.current = true;
+        firstLoadRef.current = false;
+      }
+    } catch {
+      // ignore cache errors and fall back to fetch
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [seedArtist]);
+
+  // If SSR didn't provide initial graph and nothing was restored from cache,
+  // fetch it on the client to avoid Cloudflare Worker subrequest limits during SSR.
   useEffect(() => {
     const run = async () => {
       if (!seedArtist) return;
       if (initialGraphData && initialGraphData.nodes.length) return;
+      if (restoredFromCacheRef.current) return;
       try {
         setIsClientGraphLoading(true);
         const data = await buildGraphData(seedArtist, 2);
@@ -250,6 +287,22 @@ export default function MusicMapApp({
     run();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [seedArtist]);
+
+  // Persist graph to sessionStorage so a refresh does not refetch.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const key = storageKey(seedArtist);
+    if (!key) return;
+    try {
+      if (!graph.nodes.length && !graph.links.length) {
+        sessionStorage.removeItem(key);
+      } else {
+        sessionStorage.setItem(key, JSON.stringify(graph));
+      }
+    } catch {
+      // storage may be full or unavailable – ignore
+    }
+  }, [graph, seedArtist]);
 
   const hasSearchedFromUrl = !!seedArtist;
   const hasData = graph.nodes.length > 0;
@@ -472,6 +525,9 @@ export default function MusicMapApp({
           <ModeToggle mode={mode} onModeChange={setMode} />
         </>
       )}
+
+      {/* Support button (hide on default/landing). Hidden on small screens when the panel is open to avoid overlap. */}
+      {hasSearchedFromUrl && hasData && <BuyMeACoffee panelOpen={panelOpen} />}
 
       {panelOpen && (
         <ArtistPanel
