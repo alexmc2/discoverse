@@ -19,7 +19,7 @@ export const metadata: Metadata = {
   ),
   title: 'Discoverse | Music Discovery',
   description:
-    'Discover musical connections between artists in an interactive star map. See how artists connect through genres and influences — and listen to top tracks.',
+    'See how artists connect through genres and influences in an interactive star map. Listen to top tracks.',
   keywords:
     'music, artists, visualisation, graph, network, last.fm, music discovery',
   authors: [{ name: 'Music Map' }],
@@ -44,7 +44,7 @@ export const metadata: Metadata = {
     card: 'summary_large_image',
     title: 'Discoverse | Music Discovery',
     description:
-      'See how artists connect through genres and influences — listen to top tracks.',
+      'See how artists connect through genres and influences in an interactive star map. Listen to top tracks.',
     images: ['/twitter-image?v=1'],
   },
 };
