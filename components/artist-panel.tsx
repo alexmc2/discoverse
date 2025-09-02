@@ -58,6 +58,8 @@ export default function ArtistPanel({
   onClose,
   onExpand,
 }: ArtistPanelProps) {
+  const isWorkersDev =
+    typeof window !== 'undefined' && /\.workers\.dev$/i.test(window.location.hostname);
   // Audio
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [playingTrackId, setPlayingTrackId] = useState<string | null>(null);
@@ -233,6 +235,8 @@ export default function ArtistPanel({
                           fill
                           className="rounded-full object-cover shadow-lg ring-4 ring-sky-500/30"
                           sizes="128px"
+                          unoptimized={isWorkersDev}
+                          priority
                         />
                       </div>
                     ) : (
