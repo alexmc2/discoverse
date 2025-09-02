@@ -142,6 +142,7 @@ export default function MusicMapApp({
   const [isPending, startTransition] = useTransition();
   const [showOverlay, setShowOverlay] = useState(false);
   const pendingRef = useRef(false);
+  const [isClientGraphLoading, setIsClientGraphLoading] = useState(false);
 
   useEffect(() => {
     if (isPending && !pendingRef.current) {
@@ -175,11 +176,14 @@ export default function MusicMapApp({
       if (!seedArtist) return;
       if (initialGraphData && initialGraphData.nodes.length) return;
       try {
+        setIsClientGraphLoading(true);
         const data = await buildGraphData(seedArtist, 2);
         setGraph(data);
         if (firstLoadRef.current) firstLoadRef.current = false;
       } catch {
         // keep default view on failure
+      } finally {
+        setIsClientGraphLoading(false);
       }
     };
     run();
@@ -327,8 +331,12 @@ export default function MusicMapApp({
     setClientPanelData(null);
   }, []);
 
-  const overlayMessage = isExpanding ? 'Mapping connections...' : undefined;
-  const showAnyOverlay = isExpanding || showOverlay;
+  const overlayMessage = isExpanding
+    ? 'Mapping connections...'
+    : isClientGraphLoading
+    ? 'Building your music constellation...'
+    : undefined;
+  const showAnyOverlay = isExpanding || showOverlay || isClientGraphLoading;
 
   const showDefault = !hasSearchedFromUrl || !hasData;
 
