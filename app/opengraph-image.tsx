@@ -21,12 +21,18 @@ export default async function OG() {
             'radial-gradient(1200px 600px at 20% 20%, #0ea5e980, transparent 60%), radial-gradient(1000px 600px at 80% 80%, #3730a380, transparent 60%), linear-gradient(135deg, #0b1220 0%, #0b1020 100%)',
           color: 'white',
           padding: '48px 56px',
-          fontFamily: 'Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial',
+          fontFamily:
+            'Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial',
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
           {/* Inline the app/icon.svg as JSX for reliability on edge */}
-          <svg width="112" height="112" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+          <svg
+            width="112"
+            height="112"
+            viewBox="0 0 64 64"
+            xmlns="http://www.w3.org/2000/svg"
+          >
             <defs>
               <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
                 <stop offset="0%" stopColor="#0284c7" />
@@ -58,10 +64,8 @@ export default async function OG() {
             </div>
           </div>
         </div>
-        <div style={{ fontSize: 24, opacity: 0.8 }}>discoverse.co.uk</div>
       </div>
     ),
     { ...size }
   );
 }
-
