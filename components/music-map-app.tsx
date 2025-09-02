@@ -375,7 +375,24 @@ export default function MusicMapApp({
         setActivePanelArtist(node.name);
         setClientPanelData(null);
         fetchPanelDataClient(node.name)
-          .then((data) => setClientPanelData(data))
+          .then((data) => {
+            setClientPanelData(data);
+            // If we obtained an image from Spotify that the node lacks, update it
+            const img = data?.artist?.image;
+            if (img) {
+              setGraph((prev) => {
+                let changed = false;
+                const nodes = prev.nodes.map((n) => {
+                  if (n.id === node.id && !n.image) {
+                    changed = true;
+                    return { ...n, image: img };
+                  }
+                  return n;
+                });
+                return changed ? { ...prev, nodes } : prev;
+              });
+            }
+          })
           .catch(() =>
             setClientPanelData({ artist: null, tracks: [], trackSource: null })
           );
