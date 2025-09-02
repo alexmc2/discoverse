@@ -14,9 +14,8 @@ const interTight = Inter_Tight({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL(
-    process.env.NEXT_PUBLIC_SITE_URL || 'https://discoverse.co.uk'
-  ),
+  // Hardcode canonical site URL
+  metadataBase: new URL('https://discoverse.co.uk'),
   title: 'Discoverse | Music Discovery',
   description:
     'See how artists connect through genres and influences in an interactive star map. Listen to top tracks.',
@@ -46,6 +45,9 @@ export const metadata: Metadata = {
     description:
       'See how artists connect through genres and influences in an interactive star map. Listen to top tracks.',
     images: ['/twitter-image?v=1'],
+  },
+  alternates: {
+    canonical: '/',
   },
 };
 

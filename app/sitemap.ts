@@ -1,16 +1,17 @@
 // app/sitemap.ts
 import type { MetadataRoute } from 'next';
 
+// Hardcode canonical domain for production sitemap
+const BASE = 'https://discoverse.co.uk';
+
 export default function sitemap(): MetadataRoute.Sitemap {
-  const base = process.env.NEXT_PUBLIC_SITE_URL || 'https://discoverse.co.uk';
   const now = new Date();
   return [
     {
-      url: new URL('/', base).toString(),
+      url: `${BASE}/`,
       lastModified: now,
       changeFrequency: 'weekly',
       priority: 1,
     },
   ];
 }
-
