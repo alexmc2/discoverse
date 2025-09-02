@@ -57,33 +57,94 @@ const MusicGraph = dynamic(() => import('@/components/music-graph'), {
   loading: () => <LoadingScreen message="Initializing graph engine..." />,
 });
 
-function mergeGraphs(base: GraphData, incoming: GraphData): GraphData {
+// Merge incoming graph data into the existing graph while:
+// - preserving object identity and x/y of existing nodes (keeps layout stable)
+// - anchoring new nodes near the provided focus when possible
+// - recomputing sizes by degree after merge
+function mergeGraphs(
+  base: GraphData,
+  incoming: GraphData,
+  opts?: { anchorName?: string }
+): GraphData {
+  // Produce a stable, undirected key for a link even if react-force-graph
+  // mutates source/target from ids to node objects.
+  type IdCarrier = Record<string, unknown> & { id?: unknown };
+  type LinkLike = { source: unknown; target: unknown };
+
+  const getId = (end: unknown): string => {
+    if (typeof end === 'string' || typeof end === 'number') return String(end);
+    if (end && typeof end === 'object') {
+      const obj = end as IdCarrier;
+      if ('id' in obj && (typeof obj.id === 'string' || typeof obj.id === 'number')) {
+        return String(obj.id);
+      }
+    }
+    return String(end);
+  };
+  const linkKey = (l: LinkLike) => {
+    const a = getId(l.source);
+    const b = getId(l.target);
+    return a < b ? `${a}—${b}` : `${b}—${a}`; // undirected key
+  };
+
+  // Build a map of existing node objects so we can reuse references
   const nodeMap = new Map<string, GraphNode>();
-  const linkKey = (l: GraphLink) => `${l.source}→${l.target}`;
   for (const n of base.nodes) nodeMap.set(n.id, n);
-  const linksMap = new Map<string, GraphLink>();
-  for (const l of base.links) linksMap.set(linkKey(l), l);
+
+  // Find anchor position (the node we expanded from)
+  const anchor = opts?.anchorName
+    ? (nodeMap.get(opts.anchorName) as GraphNode &
+        Partial<{ x: number; y: number }>)
+    : undefined;
+
+  // Merge/insert nodes. For existing nodes, mutate in place to keep refs.
   for (const n of incoming.nodes) {
     const prev = nodeMap.get(n.id);
-    nodeMap.set(
-      n.id,
-      prev
-        ? {
-            ...prev,
-            image: prev.image || n.image,
-            tags: prev.tags?.length ? prev.tags : n.tags,
-            size: Math.max(prev.size ?? 6, n.size ?? 6),
-            group: prev.group || n.group,
-            depth: Math.min(prev.depth ?? 99, n.depth ?? 99),
-          }
-        : n
-    );
+    if (prev) {
+      // Mutate important fields but keep existing coordinates/velocity fields.
+      (prev as GraphNode).image = prev.image || n.image;
+      (prev as GraphNode).tags = prev.tags?.length ? prev.tags : n.tags;
+      (prev as GraphNode).group = prev.group || n.group;
+      (prev as GraphNode).depth = Math.min(prev.depth ?? 99, n.depth ?? 99);
+      // Keep size conservative; we’ll recompute later as well
+      (prev as GraphNode).size = Math.max(prev.size ?? 6, n.size ?? 6);
+    } else {
+      // Create new node; if we have an anchor with coords, nudge near it
+      const created: GraphNode & Partial<{ x: number; y: number }> = {
+        ...n,
+      };
+      if (anchor && typeof anchor.x === 'number' && typeof anchor.y === 'number') {
+        const jitter = () => (Math.random() - 0.5) * 20; // small spread near anchor
+        created.x = anchor.x + jitter();
+        created.y = anchor.y + jitter();
+      }
+      nodeMap.set(n.id, created);
+    }
   }
-  for (const l of incoming.links) linksMap.set(linkKey(l), l);
-  return {
-    nodes: Array.from(nodeMap.values()),
-    links: Array.from(linksMap.values()),
-  };
+
+  // Merge links (dedupe by source→target key)
+  const linksMap = new Map<string, GraphLink>();
+  for (const l of base.links) linksMap.set(linkKey(l as unknown as LinkLike), l);
+  for (const l of incoming.links) linksMap.set(linkKey(l as unknown as LinkLike), l);
+
+  const mergedNodes = Array.from(nodeMap.values());
+  const mergedLinks = Array.from(linksMap.values());
+
+  // Recompute node sizes from degree so older nodes grow when gaining edges
+  const degree = new Map<string, number>();
+  for (const l of mergedLinks) {
+    const lk = l as unknown as LinkLike;
+    const s = getId(lk.source);
+    const t = getId(lk.target);
+    degree.set(s, (degree.get(s) || 0) + 1);
+    degree.set(t, (degree.get(t) || 0) + 1);
+  }
+  for (const node of mergedNodes) {
+    const connections = degree.get(node.id) || 1;
+    node.size = Math.min(Math.max(6, connections * 2), 30);
+  }
+
+  return { nodes: mergedNodes, links: mergedLinks };
 }
 
 async function fetchPanelDataClient(artistName: string): Promise<PanelData> {
@@ -194,7 +255,7 @@ export default function MusicMapApp({
   const hasData = graph.nodes.length > 0;
 
   const [centerNodeName, setCenterNodeName] = useState<string | null>(
-    seedArtist ?? null
+    seedArtist ?? null 
   );
 
   useEffect(() => {
@@ -246,6 +307,11 @@ export default function MusicMapApp({
 
   const startNewSearch = useCallback(
     (artistName: string) => {
+      // ALWAYS start a fresh graph when using the main search bar
+      // or the random artist buttons. Only node clicks/panel actions extend.
+      const trimmed = artistName?.trim();
+      if (!trimmed) return;
+
       setPanelOpen(false);
       setActivePanelArtist(null);
       setClientPanelData(null);
@@ -257,9 +323,7 @@ export default function MusicMapApp({
       setResetSignal((s) => s + 1);
 
       startTransition(() => {
-        const trimmed = artistName?.trim();
-        if (trimmed) router.replace(`/?q=${encodeURIComponent(trimmed)}`);
-        else router.replace(`/`);
+        router.replace(`/?q=${encodeURIComponent(trimmed)}`);
       });
     },
     [router, setUrlFocus, clearAllQueryParams]
@@ -272,7 +336,7 @@ export default function MusicMapApp({
       try {
         const incoming = await buildGraphData(artistName, 2);
         if (expandTokenRef.current !== token) return;
-        setGraph((prev) => mergeGraphs(prev, incoming));
+        setGraph((prev) => mergeGraphs(prev, incoming, { anchorName: artistName }));
         setCenterNodeName(artistName);
         setUrlFocus(artistName);
       } catch {
@@ -300,6 +364,11 @@ export default function MusicMapApp({
   const handleNodeClick = useCallback(
     (node: GraphNode) => {
       if (mode === 'map') {
+        // Clicking the current center should just recenter, not expand.
+        if (centerNodeName && node.name === centerNodeName) {
+          setRecenterSignal((s) => s + 1);
+          return;
+        }
         expandFrom(node.name);
       } else {
         setPanelOpen(true);
@@ -312,7 +381,7 @@ export default function MusicMapApp({
           );
       }
     },
-    [mode, expandFrom]
+    [mode, expandFrom, centerNodeName]
   );
 
   const handleExpandFromPanel = useCallback(

@@ -106,6 +106,8 @@ export default function MusicGraph({
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  const didInitialFitRef = useRef(false);
+
   useEffect(() => {
     if (graphRef.current && data.nodes.length > 0) {
       const charge = graphRef.current.d3Force('charge') as
@@ -120,7 +122,11 @@ export default function MusicGraph({
         | { strength: (n: number) => void }
         | undefined;
       center?.strength(0.05);
-      setTimeout(() => graphRef.current?.zoomToFit(400, 50), 500);
+      // Only perform an automatic fit once on first data load.
+      if (!didInitialFitRef.current) {
+        setTimeout(() => graphRef.current?.zoomToFit(400, 50), 500);
+        didInitialFitRef.current = true;
+      }
     }
   }, [data]);
 
@@ -507,7 +513,13 @@ export default function MusicGraph({
         minZoom={0.1}
         maxZoom={7}
         cooldownTicks={100}
-        onEngineStop={() => graphRef.current?.zoomToFit(400, 50)}
+        onEngineStop={() => {
+          // Avoid overriding user focus after expansions; only fit once
+          if (!didInitialFitRef.current) {
+            graphRef.current?.zoomToFit(400, 50);
+            didInitialFitRef.current = true;
+          }
+        }}
         nodeLabel={() => ''}
       />
     </div>
