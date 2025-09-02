@@ -11,6 +11,7 @@ import {
   getArtistTopTracks,
   getArtistSpotifyUrl, // <-- now exported
 } from '@/lib/spotify';
+// No caching here: keep randomization per request. Heavy lookups are cached elsewhere.
 
 export interface ArtistDetails {
   name: string;
@@ -187,11 +188,11 @@ const POPULAR_ARTISTS_POOL = [
   'NewJeans',
 ];
 
-export async function getRandomArtists(): Promise<string[]> {
+export async function getRandomArtists(count: number = 4): Promise<string[]> {
   const shuffled = [...POPULAR_ARTISTS_POOL];
   for (let i = shuffled.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
   }
-  return shuffled.slice(0, 4);
+  return shuffled.slice(0, count);
 }

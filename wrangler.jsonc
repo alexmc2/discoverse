@@ -1,17 +1,35 @@
 {
-  "name": "discoverse",
-  "main": ".open-next/worker.js",
-  "compatibility_date": "2025-03-25",
-  "compatibility_flags": ["nodejs_compat"],
-  "assets": { "directory": ".open-next/assets", "binding": "ASSETS" },
-
-  // ⬇️ No "routes" at the root for dev
-  "env": {
-    "production": {
-      "routes": [
-        { "pattern": "discoverse.co.uk", "custom_domain": true },
-        { "pattern": "www.discoverse.co.uk", "custom_domain": true }
-      ]
-    }
-  }
+	"name": "discoverse",
+	"main": ".open-next/worker.js",
+	"compatibility_date": "2025-03-25",
+	"compatibility_flags": [
+		"nodejs_compat"
+	],
+	"assets": {
+		"directory": ".open-next/assets",
+		"binding": "ASSETS"
+	},
+	// Add KV IDs after creation. Keep empty to avoid Wrangler parse errors until ready.
+	"kv_namespaces": [
+		{
+			"binding": "MUSIC_CACHE",
+			"id": "60b49d2cd6cf432baf7efec82aad0481",
+			"preview_id": "d0f73a4bca324fb29fd1b93211a79655"
+		}
+	],
+	// ⬇️ No "routes" at the root for dev
+	"env": {
+		"production": {
+			"routes": [
+				{
+					"pattern": "discoverse.co.uk",
+					"custom_domain": true
+				},
+				{
+					"pattern": "www.discoverse.co.uk",
+					"custom_domain": true
+				}
+			]
+		}
+	}
 }

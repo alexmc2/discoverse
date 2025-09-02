@@ -3,6 +3,10 @@ import type { ImageLoaderProps } from 'next/image';
 const normalizeSrc = (src: string) =>
   src.startsWith('/') ? src.slice(1) : src;
 
+function isAbsoluteUrl(src: string): boolean {
+  return /^https?:\/\//i.test(src);
+}
+
 // Turn CF resizing on only if explicitly enabled and supported by the host.
 // workers.dev does not support the "/cdn-cgi/image" endpoint for remote origins.
 const BASE_USE_CF =
@@ -28,7 +32,11 @@ export default function cloudflareLoader({
   width,
   quality,
 }: ImageLoaderProps) {
-  if (!USE_CF_RESIZE) return src; // plain URL in dev/preview
+  // If CF resizing is disabled or the src is a remote absolute URL,
+  // return the original source. Many third‑party hosts (e.g., Spotify)
+  // work better when requested directly rather than proxied via
+  // /cdn-cgi/image unless the zone explicitly enables Remote Fetching.
+  if (!USE_CF_RESIZE || isAbsoluteUrl(src)) return src;
   const params = [`width=${width}`];
   if (quality) params.push(`quality=${quality}`);
   return `/cdn-cgi/image/${params.join(',')}/${normalizeSrc(src)}`;
