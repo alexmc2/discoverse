@@ -70,13 +70,13 @@ export default function ModeToggle({
           </Tooltip>
         </div>
         {/* Mobile-only helper text since tooltips don't work well on touch devices */}
-        {/* <div className="mt-1 sm:hidden text-xs leading-snug text-gray-400">
+        <div className="mt-1 sm:hidden text-xs leading-snug text-gray-400">
           {mode === 'map' ? (
             <p>Click artist image to map more connections</p>
           ) : (
             <p>Click artist image to open info panel</p>
           )}
-        </div> */}
+        </div>
       </TooltipProvider>
     </div>
   );
