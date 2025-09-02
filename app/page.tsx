@@ -1,10 +1,6 @@
 // app/page.tsx
 import MusicMapApp from '@/components/music-map-app';
-import {
-  fetchGraphData,
-  fetchArtistData,
-  getRandomArtists,
-} from '@/lib/server/artists';
+import { getRandomArtists } from '@/lib/server/artists';
 
 interface PageProps {
   params: Promise<Record<string, string | string[] | undefined>>;
@@ -32,17 +28,13 @@ export default async function Home({ searchParams }: PageProps) {
     );
   }
 
-  // With a query: fetch graph + panel data in parallel on the server
-  const [graphData, panelData] = await Promise.all([
-    fetchGraphData(seedArtist),
-    fetchArtistData(seedArtist),
-  ]);
-
+  // To avoid Cloudflare Worker subrequest limits during SSR,
+  // do not prefetch graph or panel on the server. The client will load them.
   return (
     <MusicMapApp
       seedArtist={seedArtist}
-      initialGraphData={graphData}
-      panelData={panelData}
+      initialGraphData={null}
+      panelData={null}
       randomArtists={randomArtists}
     />
   );

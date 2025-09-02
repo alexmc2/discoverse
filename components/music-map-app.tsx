@@ -168,6 +168,24 @@ export default function MusicMapApp({
     if (firstLoadRef.current) firstLoadRef.current = false;
   }, [initialGraphData]);
 
+  // If SSR didn't provide initial graph, fetch it on the client to
+  // avoid Cloudflare Worker subrequest limits during SSR.
+  useEffect(() => {
+    const run = async () => {
+      if (!seedArtist) return;
+      if (initialGraphData && initialGraphData.nodes.length) return;
+      try {
+        const data = await buildGraphData(seedArtist, 2);
+        setGraph(data);
+        if (firstLoadRef.current) firstLoadRef.current = false;
+      } catch {
+        // keep default view on failure
+      }
+    };
+    run();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [seedArtist]);
+
   const hasSearchedFromUrl = !!seedArtist;
   const hasData = graph.nodes.length > 0;
 
