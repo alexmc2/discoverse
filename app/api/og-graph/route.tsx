@@ -2,7 +2,8 @@
 import { ImageResponse } from 'next/og';
 import type { NextRequest } from 'next/server';
 
-export const runtime = 'edge';
+// Note: Avoid edge runtime for OpenNext Cloudflare bundle.
+// Default to nodejs_compat (Workers) by omitting `runtime = 'edge'`.
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
@@ -66,4 +67,3 @@ export async function GET(req: NextRequest) {
     size
   );
 }
-
