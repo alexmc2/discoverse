@@ -31,7 +31,7 @@ export const metadata: Metadata = {
     locale: 'en_GB',
     images: [
       {
-        url: '/og.png?v=3',
+        url: '/og.png?v=5',
         width: 1200,
         height: 630,
         type: 'image/png',
@@ -44,7 +44,7 @@ export const metadata: Metadata = {
     title: 'Discoverse | Music Discovery',
     description:
       'See how artists connect through genres and influences in an interactive star map. Listen to top tracks.',
-    images: ['/og.png?v=3'],
+    images: ['/og.png?v=5'],
   },
   alternates: {
     canonical: '/',

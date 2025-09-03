@@ -57,10 +57,13 @@ export default async function OG() {
               <path d="M22 10v3" />
             </g>
           </svg>
-          <div style={{ display: 'flex', flexDirection: 'column' }}>
+          <div
+            style={{ display: 'flex', flexDirection: 'column', maxWidth: 800 }}
+          >
             <div style={{ fontSize: 64, fontWeight: 800 }}>Discoverse</div>
             <div style={{ fontSize: 28, opacity: 0.9 }}>
-              See how artists connect through genres and influences
+              See how artists connect through genres and influences. Listen to
+              top tracks.
             </div>
           </div>
         </div>

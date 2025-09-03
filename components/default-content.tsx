@@ -45,7 +45,7 @@ export default function DefaultContent({
 
         <p className="text-gray-400 max-w-md mx-auto mb-8">
           See how artists connect through genres and influences in an
-          interactive star map. Listen to top tracks. 
+          interactive star map. Listen to top tracks.
         </p>
 
         <div className="flex flex-wrap gap-2 justify-center min-h-[44px]">
@@ -53,9 +53,12 @@ export default function DefaultContent({
             <button
               key={artist}
               onClick={() => onSearch(artist)}
-              className="cursor-pointer px-4 py-2 bg-gray-800/50 text-gray-300 rounded-full text-sm transition-all duration-300 border border-sky-900/70 hover:text-white hover:bg-gradient-to-r hover:from-sky-900/30 hover:via-blue-900/30 hover:to-indigo-900/30"
+              className="group relative h-9 px-4 rounded-md text-sm  bg-slate-800 text-gray-300 cursor-pointer overflow-hidden"
             >
-              {artist}
+              <span className="absolute inset-0 bg-gradient-to-br from-sky-600 via-blue-600 to-indigo-600 opacity-0 group-hover:opacity-100 transition-opacity duration-300 ease-out"></span>
+              <span className="relative z-10 transition-colors duration-300 ease-out group-hover:text-white">
+                {artist}
+              </span>
             </button>
           ))}
         </div>

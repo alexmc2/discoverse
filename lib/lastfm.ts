@@ -147,10 +147,14 @@ export async function searchArtist(
   minListeners = MIN_LISTENERS
 ): Promise<Artist[]> {
   if (!query) return [];
-  const data = await lastfmGet<LfSearchResults>('artist.search', {
-    artist: query,
-    limit: 30,
-  }, 6 * 60 * 60);
+  const data = await lastfmGet<LfSearchResults>(
+    'artist.search',
+    {
+      artist: query,
+      limit: 30,
+    },
+    6 * 60 * 60
+  );
   const artists = data?.results?.artistmatches?.artist ?? [];
 
   const filtered = (artists || []).filter((a) => {
@@ -170,10 +174,14 @@ export async function getSimilarArtists(
   artistName: string,
   limit = 20
 ): Promise<Artist[]> {
-  const data = await lastfmGet<LfSimilarResp>('artist.getsimilar', {
-    artist: artistName,
-    limit,
-  }, 12 * 60 * 60);
+  const data = await lastfmGet<LfSimilarResp>(
+    'artist.getsimilar',
+    {
+      artist: artistName,
+      limit,
+    },
+    12 * 60 * 60
+  );
   const similar = data?.similarartists?.artist ?? [];
   return (similar || []).map((artist, index) => ({
     id: artist.mbid ? `${artist.mbid}-${index}` : `${artist.name}-${index}`,
@@ -188,9 +196,13 @@ export async function getSimilarArtists(
 }
 
 export async function getArtistTags(artistName: string): Promise<string[]> {
-  const data = await lastfmGet<LfTopTagsResp>('artist.gettoptags', {
-    artist: artistName,
-  }, 24 * 60 * 60);
+  const data = await lastfmGet<LfTopTagsResp>(
+    'artist.gettoptags',
+    {
+      artist: artistName,
+    },
+    24 * 60 * 60
+  );
   const tags = data?.toptags?.tag ?? [];
   return (tags || [])
     .slice(0, 5)
@@ -199,9 +211,13 @@ export async function getArtistTags(artistName: string): Promise<string[]> {
 }
 
 export async function getArtistInfo(artistName: string) {
-  const data = await lastfmGet<LfInfoResp>('artist.getinfo', {
-    artist: artistName,
-  }, 24 * 60 * 60);
+  const data = await lastfmGet<LfInfoResp>(
+    'artist.getinfo',
+    {
+      artist: artistName,
+    },
+    24 * 60 * 60
+  );
   const artist = data?.artist;
   if (!artist) return null;
 
@@ -226,10 +242,14 @@ export async function getTopTracks(
   artistName: string,
   limit = 10
 ): Promise<Track[]> {
-  const data = await lastfmGet<LfTopTracksResp>('artist.gettoptracks', {
-    artist: artistName,
-    limit,
-  }, 12 * 60 * 60);
+  const data = await lastfmGet<LfTopTracksResp>(
+    'artist.gettoptracks',
+    {
+      artist: artistName,
+      limit,
+    },
+    12 * 60 * 60
+  );
   const tracks = data?.toptracks?.track ?? [];
   return (tracks || []).map((track) => ({
     name: track.name,

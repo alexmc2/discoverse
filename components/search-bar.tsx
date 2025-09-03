@@ -122,9 +122,9 @@ export default function SearchBar({
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={handleKeyDown}
             onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
-            placeholder="Search for an artist or band..."
+            placeholder="Search for an artist..."
             disabled={isLoading}
-            className="w-full sm:h-11 h-10 pl-12 pr-10 bg-slate-800 text-white backdrop-blur-xl border-gray-800 placeholder-gray-500 focus:border-sky-800"
+            className="w-full sm:h-9 h-9 pl-12 pr-10 bg-slate-800 text-white backdrop-blur-xl border-gray-800 placeholder-gray-500 focus:border-sky-800"
           />
 
           <Search className="absolute left-4 w-5 h-5 text-gray-500" />

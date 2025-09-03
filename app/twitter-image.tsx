@@ -21,11 +21,17 @@ export default async function TwitterImage() {
             'radial-gradient(800px 418px at 20% 20%, #0ea5e970, transparent 60%), radial-gradient(700px 418px at 80% 80%, #3730a370, transparent 60%), linear-gradient(135deg, #0b1220 0%, #0b1020 100%)',
           color: 'white',
           padding: '28px 36px',
-          fontFamily: 'Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial',
+          fontFamily:
+            'Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial',
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 18 }}>
-          <svg width="84" height="84" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+          <svg
+            width="84"
+            height="84"
+            viewBox="0 0 64 64"
+            xmlns="http://www.w3.org/2000/svg"
+          >
             <defs>
               <linearGradient id="g2" x1="0" y1="0" x2="1" y2="1">
                 <stop offset="0%" stopColor="#0284c7" />
@@ -50,17 +56,18 @@ export default async function TwitterImage() {
               <path d="M22 10v3" />
             </g>
           </svg>
-          <div style={{ display: 'flex', flexDirection: 'column' }}>
-            <div style={{ fontSize: 44, fontWeight: 800 }}>Discoverse</div>
-            <div style={{ fontSize: 20, opacity: 0.9 }}>
-              Explore artist connections and top tracks
+          <div
+            style={{ display: 'flex', flexDirection: 'column', maxWidth: 800 }}
+          >
+            <div style={{ fontSize: 64, fontWeight: 800 }}>Discoverse</div>
+            <div style={{ fontSize: 28, opacity: 0.9 }}>
+              See how artists connect through genres and influences. Listen to
+              top tracks.
             </div>
           </div>
         </div>
-        <div style={{ fontSize: 18, opacity: 0.8 }}>discoverse.co.uk</div>
       </div>
     ),
     { ...size }
   );
 }
-

@@ -10,16 +10,19 @@ export async function GET() {
           height: '100%',
           display: 'flex',
           alignItems: 'center',
-          justifyContent: 'space-between',
+          justifyContent: 'flex-start',
           background:
             'radial-gradient(1200px 600px at 20% 20%, #0ea5e980, transparent 60%), radial-gradient(1000px 600px at 80% 80%, #3730a380, transparent 60%), linear-gradient(135deg, #0b1220 0%, #0b1020 100%)',
           color: 'white',
-          padding: '48px 56px',
+          // top right bottom left
+          padding: '48px 88px 48px 56px',
           fontFamily:
             'Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
+        <div
+          style={{ display: 'flex', alignItems: 'center', gap: 24, width: 980 }}
+        >
           {/* Inline the app/icon.svg */}
           <svg
             width="112"
@@ -34,7 +37,15 @@ export async function GET() {
                 <stop offset="100%" stopColor="#4f46e5" />
               </linearGradient>
             </defs>
-            <rect x="0" y="0" width="64" height="64" fill="url(#g)" />
+            <rect
+              x="0"
+              y="0"
+              width="64"
+              height="64"
+              rx="12"
+              ry="12"
+              fill="url(#g)"
+            />
             <g
               transform="translate(14,14) scale(1.5)"
               stroke="white"
@@ -51,10 +62,12 @@ export async function GET() {
               <path d="M22 10v3" />
             </g>
           </svg>
-          <div style={{ display: 'flex', flexDirection: 'column' }}>
+          <div
+            style={{ display: 'flex', flexDirection: 'column', maxWidth: 800 }}
+          >
             <div style={{ fontSize: 64, fontWeight: 800 }}>Discoverse</div>
-            <div style={{ fontSize: 28, opacity: 0.9, maxWidth: 760 }}>
-              See how artists connect through genres and influences — listen to
+            <div style={{ fontSize: 28, opacity: 0.9 }}>
+              See how artists connect through genres and influences. Listen to
               top tracks.
             </div>
           </div>

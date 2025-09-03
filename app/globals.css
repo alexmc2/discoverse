@@ -4,6 +4,9 @@
 :root {
   --background: #030014;
   --foreground: #ededed;
+  /* Accent hues for subtle torch */
+  --color-accent-light: theme(colors.sky.500/0.08);
+  --color-accent-torch: theme(colors.blue.700/0.12);
 }
 
 html {
@@ -84,3 +87,16 @@ body {
 .animate-pulse-glow {
   animation: pulse-glow 2s ease-in-out infinite;
 }
+
+/* ===== Cursor torch glow ===== */
+/* .bg-torch {
+
+  background: radial-gradient(
+    400px circle at center,
+    var(--color-accent-light) 0%,
+    var(--color-accent-torch) 1%,
+    transparent 90%
+  );
+  mix-blend-mode: screen;
+  will-change: left, top;
+} */

@@ -1,3 +1,4 @@
+// image-loader.ts
 import type { ImageLoaderProps } from 'next/image';
 
 const normalizeSrc = (src: string) =>

@@ -36,8 +36,8 @@ export default function Header({
   return (
     <header className="fixed top-0 left-0 right-0 z-40 px-3 sm:px-4 sm:pt-4 pt-3">
       {/* Left-aligned wrapper controls title, search, and recenter placement */}
-      <div className="w-full max-w-md">
-        <div className="flex items-center gap-2 sm:pb-2 pb-3">
+      <div className="w-full sm:max-w-sm max-w-screen">
+        <div className="flex items-center gap-2 sm:pb-3 pb-2">
           <div className="sm:w-10 sm:h-10 w-8 h-8 rounded-lg flex items-center justify-center bg-gradient-to-br from-sky-600 via-blue-600 to-indigo-600">
             <AudioLines className="sm:w-6 w-5 h-5 sm:h-6 text-white" />
           </div>
@@ -62,34 +62,44 @@ export default function Header({
               </button>
             )}
 
-            {/* Desktop: keep reset button in title row */}
-            {hasSearched && hasData && (
-              <button
-                onClick={onClearData}
-                className="hidden sm:inline-flex cursor-pointer px-4 py-2 bg-slate-800 text-gray-200 rounded-md text-sm transition-all duration-300 border border-gray-700 hover:text-white hover:bg-slate-900"
-              >
-                Reset Graph
-              </button>
-            )}
+            {/* Desktop reset moved next to search below */}
           </div>
         </div>
 
-        {/* Search + mobile reset (mobile only shows the inline reset) */}
-        <div className="flex items-center gap-2 sm:block">
-          <div className="flex-1">
-            <SearchBar
-              onSearch={onSearch}
-              isLoading={isLoading}
-              resetSignal={resetSignal}
-            />
+        {/* Search + reset
+           - Mobile: Reset sits to the right of the input
+           - Desktop: Reset Graph sits below the input */}
+        <div className="sm:block">
+          <div className="flex items-center gap-2">
+            <div className="flex-1">
+              <SearchBar
+                onSearch={onSearch}
+                isLoading={isLoading}
+                resetSignal={resetSignal}
+              />
+            </div>
+            {hasSearched && hasData && (
+              <button
+                onClick={onClearData}
+                className="sm:hidden h-9 px-3 bg-slate-800 text-gray-200 rounded-md text-sm transition-all duration-300  hover:text-white hover:bg-slate-900 cursor-pointer"
+              >
+                Reset
+              </button>
+            )}
           </div>
+
           {hasSearched && hasData && (
-            <button
-              onClick={onClearData}
-              className="sm:hidden h-10 px-3 bg-slate-800 text-gray-200 rounded-md text-sm transition-all duration-300 border border-gray-700 hover:text-white hover:bg-slate-900 cursor-pointer"
-            >
-              Reset
-            </button>
+            <div className="hidden sm:block mt-3">
+              <button
+                onClick={onClearData}
+                className="group relative h-9 px-4 rounded-md text-sm  bg-slate-800 text-gray-300 cursor-pointer overflow-hidden"
+              >
+                <span className="absolute inset-0 bg-gradient-to-br from-sky-600 via-blue-600 to-indigo-600 opacity-0 group-hover:opacity-100 transition-opacity duration-300 ease-out"></span>
+                <span className="relative z-10 transition-colors duration-300 ease-out group-hover:text-white">
+                  Reset Graph
+                </span>
+              </button>
+            </div>
           )}
         </div>
 
