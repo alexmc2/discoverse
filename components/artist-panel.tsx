@@ -14,6 +14,7 @@ import {
   Volume2,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+// no visual tooltips; use screen reader labels on controls
 
 export interface ArtistDetails {
   name: string;
@@ -321,37 +322,31 @@ export default function ArtistPanel({
                               key={track.id}
                               className="flex items-center gap-3 p-3 rounded-lg bg-gray-800/30 hover:bg-gradient-to-r hover:from-sky-900/20 hover:via-blue-900/20 hover:to-indigo-900/20 transition-all duration-300 group"
                             >
-                              <button
-                                onClick={() =>
-                                  canPlay ? playPreview(track) : undefined
-                                }
-                                disabled={!canPlay}
-                                className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center transition-all ${
-                                  canPlay
-                                    ? 'cursor-pointer bg-gradient-to-br from-sky-600 via-blue-600 to-indigo-600 hover:brightness-110'
-                                    : 'cursor-not-allowed bg-gray-700'
-                                }`}
-                                aria-label={
-                                  canPlay
-                                    ? isThisPlaying
-                                      ? 'Pause preview'
-                                      : 'Play preview'
-                                    : 'Preview unavailable'
-                                }
-                                title={
-                                  canPlay
-                                    ? isThisPlaying
-                                      ? 'Pause preview'
-                                      : 'Play 30s preview'
-                                    : 'Preview unavailable'
-                                }
-                              >
-                                {isThisPlaying ? (
-                                  <Pause className="w-4 h-4 text-white" />
-                                ) : (
+                              {/* Play/Pause — no popup; screen reader labels only */}
+                              {canPlay ? (
+                                <button
+                                  onClick={() => playPreview(track)}
+                                  className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center transition-all cursor-pointer bg-gradient-to-br from-sky-600 via-blue-600 to-indigo-600 hover:brightness-110"
+                                  aria-label={
+                                    isThisPlaying ? 'Pause preview' : 'Play 30-second preview'
+                                  }
+                                >
+                                  {isThisPlaying ? (
+                                    <Pause className="w-4 h-4 text-white" />
+                                  ) : (
+                                    <Play className="w-4 h-4 text-white ml-0.5" />
+                                  )}
+                                </button>
+                              ) : (
+                                <button
+                                  disabled
+                                  aria-disabled="true"
+                                  className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center transition-all cursor-not-allowed bg-gray-700"
+                                  aria-label="Preview unavailable"
+                                >
                                   <Play className="w-4 h-4 text-white ml-0.5" />
-                                )}
-                              </button>
+                                </button>
+                              )}
 
                               <div className="flex-1 min-w-0">
                                 <h5 className="text-sm font-medium text-white truncate">
