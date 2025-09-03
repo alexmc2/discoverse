@@ -1,8 +1,6 @@
 // app/og.png/route.tsx
 import { ImageResponse } from 'next/og';
 
-export const contentType = 'image/png';
-
 export async function GET() {
   return new ImageResponse(
     (
