@@ -17,12 +17,18 @@ export async function GET() {
             'radial-gradient(1200px 600px at 20% 20%, #0ea5e980, transparent 60%), radial-gradient(1000px 600px at 80% 80%, #3730a380, transparent 60%), linear-gradient(135deg, #0b1220 0%, #0b1020 100%)',
           color: 'white',
           padding: '48px 56px',
-          fontFamily: 'Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial',
+          fontFamily:
+            'Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial',
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
           {/* Inline the app/icon.svg */}
-          <svg width="112" height="112" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+          <svg
+            width="112"
+            height="112"
+            viewBox="0 0 64 64"
+            xmlns="http://www.w3.org/2000/svg"
+          >
             <defs>
               <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
                 <stop offset="0%" stopColor="#0284c7" />
@@ -50,14 +56,13 @@ export async function GET() {
           <div style={{ display: 'flex', flexDirection: 'column' }}>
             <div style={{ fontSize: 64, fontWeight: 800 }}>Discoverse</div>
             <div style={{ fontSize: 28, opacity: 0.9, maxWidth: 760 }}>
-              See how artists connect through genres and influences — listen to top tracks.
+              See how artists connect through genres and influences — listen to
+              top tracks.
             </div>
           </div>
         </div>
-        <div style={{ fontSize: 24, opacity: 0.85 }}>discoverse.co.uk</div>
       </div>
     ),
     { width: 1200, height: 630 }
   );
 }
-
