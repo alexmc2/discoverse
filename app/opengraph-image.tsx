@@ -1,6 +1,9 @@
 // app/opengraph-image.tsx
 import { ImageResponse } from 'next/og';
 
+export const runtime = 'edge';
+export const dynamic = 'force-dynamic';
+
 export const size = {
   width: 1200,
   height: 630,
@@ -62,13 +65,17 @@ export default async function OG() {
           >
             <div style={{ fontSize: 64, fontWeight: 800 }}>Discoverse</div>
             <div style={{ fontSize: 28, opacity: 0.9 }}>
-              See how artists connect through genres and influences. Listen to
-              top tracks.
+              Discover similar artists and listen to top tracks.
             </div>
           </div>
         </div>
       </div>
     ),
-    { ...size }
+    {
+      ...size,
+      headers: {
+        'Cache-Control': 'no-store, no-cache, max-age=0, must-revalidate',
+      },
+    }
   );
 }

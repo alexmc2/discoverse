@@ -1,6 +1,10 @@
 // app/og.png/route.tsx
 import { ImageResponse } from 'next/og';
 
+// Ensure this route is always rendered dynamically and not cached by CDN
+export const runtime = 'edge';
+export const dynamic = 'force-dynamic';
+
 export async function GET() {
   return new ImageResponse(
     (
@@ -67,13 +71,19 @@ export async function GET() {
           >
             <div style={{ fontSize: 64, fontWeight: 800 }}>Discoverse</div>
             <div style={{ fontSize: 28, opacity: 0.9 }}>
-              See how artists connect through genres and influences. Listen to
-              top tracks.
+              Discover similar artists and listen to top tracks.
             </div>
           </div>
         </div>
       </div>
     ),
-    { width: 1200, height: 630 }
+    {
+      width: 1200,
+      height: 630,
+      // Prevent CDN/browser caching so changes appear immediately
+      headers: {
+        'Cache-Control': 'no-store, no-cache, max-age=0, must-revalidate',
+      },
+    }
   );
 }
