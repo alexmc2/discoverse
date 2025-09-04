@@ -1,7 +1,7 @@
 // app/opengraph-image.tsx
 import { ImageResponse } from 'next/og';
 
-export const runtime = 'edge';
+export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 export const size = {

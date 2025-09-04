@@ -2,7 +2,7 @@
 import { ImageResponse } from 'next/og';
 
 // Ensure this route is always rendered dynamically and not cached by CDN
-export const runtime = 'edge';
+export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
