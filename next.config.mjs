@@ -38,6 +38,19 @@ const nextConfig = {
     ].join('; ');
 
     return [
+      // Explicit no-cache for metadata routes important for SEO
+      {
+        source: '/sitemap.xml',
+        headers: [
+          { key: 'Cache-Control', value: 'no-store, no-cache, max-age=0, must-revalidate' },
+        ],
+      },
+      {
+        source: '/robots.txt',
+        headers: [
+          { key: 'Cache-Control', value: 'no-store, no-cache, max-age=0, must-revalidate' },
+        ],
+      },
       {
         source: '/:path*',
         headers: [
