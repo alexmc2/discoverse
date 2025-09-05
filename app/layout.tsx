@@ -31,8 +31,8 @@ export const metadata: Metadata = {
     locale: 'en_GB',
     images: [
       {
-        // Point to a fresh dynamic route path to avoid any stale static asset
-        url: '/opengraph-image?v=7',
+        // Use a single dynamic PNG for all platforms (no query params)
+        url: '/og.png',
         width: 1200,
         height: 630,
         type: 'image/png',
@@ -45,8 +45,8 @@ export const metadata: Metadata = {
     title: 'Discoverse | Music Discovery',
     description:
       'See how artists connect through genres and influences in an interactive star map. Listen to top tracks.',
-    // Use the dedicated twitter image route and a new version to bust X cache
-    images: ['/twitter-image?v=7'],
+    // Point Twitter to the same dynamic PNG
+    images: ['/og.png'],
   },
   alternates: {
     canonical: '/',
