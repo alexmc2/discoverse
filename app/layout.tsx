@@ -21,7 +21,7 @@ export const metadata: Metadata = {
     'See how artists connect through genres and influences in an interactive star map. Listen to top tracks.',
   keywords:
     'music, artists, visualisation, graph, network, last.fm, music discovery',
-  authors: [{ name: 'Music Map' }],
+  authors: [{ name: 'Discoverse' }],
   openGraph: {
     title: 'Discoverse | Music Discovery',
     description:
@@ -29,6 +29,7 @@ export const metadata: Metadata = {
     type: 'website',
     siteName: 'Discoverse',
     locale: 'en_GB',
+    url: 'https://discoverse.co.uk',
     images: [
       {
         // Use a single dynamic PNG for all platforms (no query params)

@@ -5,8 +5,8 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 export const size = {
-  width: 800,
-  height: 418,
+  width: 1200,
+  height: 630,
 };
 export const contentType = 'image/png';
 
@@ -19,19 +19,20 @@ export default async function TwitterImage() {
           height: '100%',
           display: 'flex',
           alignItems: 'center',
-          justifyContent: 'space-between',
+          justifyContent: 'flex-start',
           background:
-            'radial-gradient(800px 418px at 20% 20%, #0ea5e970, transparent 60%), radial-gradient(700px 418px at 80% 80%, #3730a370, transparent 60%), linear-gradient(135deg, #0b1220 0%, #0b1020 100%)',
+            'radial-gradient(1200px 600px at 20% 20%, #0ea5e980, transparent 60%), radial-gradient(1000px 600px at 80% 80%, #3730a380, transparent 60%), linear-gradient(135deg, #0b1220 0%, #0b1020 100%)',
           color: 'white',
-          padding: '28px 36px',
+          // top right bottom left to match /og.png
+          padding: '48px 88px 48px 56px',
           fontFamily:
             'Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 18 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 24, width: 980 }}>
           <svg
-            width="84"
-            height="84"
+            width="112"
+            height="112"
             viewBox="0 0 64 64"
             xmlns="http://www.w3.org/2000/svg"
           >
@@ -42,7 +43,7 @@ export default async function TwitterImage() {
                 <stop offset="100%" stopColor="#4f46e5" />
               </linearGradient>
             </defs>
-            <rect x="0" y="0" width="64" height="64" fill="url(#g2)" />
+            <rect x="0" y="0" width="64" height="64" rx="12" ry="12" fill="url(#g2)" />
             <g
               transform="translate(14,14) scale(1.5)"
               stroke="white"
