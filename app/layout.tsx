@@ -22,6 +22,13 @@ export const metadata: Metadata = {
   keywords:
     'music, artists, visualisation, graph, network, last.fm, music discovery',
   authors: [{ name: 'Discoverse' }],
+  // Explicitly declare PNG favicon for Google Search (SVG not supported there)
+  icons: {
+    icon: [
+      { url: '/favicon.png', type: 'image/png', sizes: '64x64' },
+      { url: '/icon.svg', type: 'image/svg+xml' },
+    ],
+  },
   openGraph: {
     title: 'Discoverse | Music Discovery',
     description:
