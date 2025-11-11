@@ -20,13 +20,13 @@ const nextConfig = {
     const csp = [
       "default-src 'self'",
       // Allow Next.js inline hydration and HMR/dev scripts
-      `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ''}`,
+      `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ''} https://static.cloudflareinsights.com`,
       // Images from self (CF resize) + Spotify + Last.fm + data URIs
       "img-src 'self' https://i.scdn.co https://lastfm.freetls.fastly.net https://lastfm-img2.akamaized.net data:",
       // Audio previews from Spotify and iTunes
       "media-src 'self' https://*.scdn.co https://*.spotifycdn.com https://audio-ssl.itunes.apple.com",
       // App/API calls (fetch/XHR)
-      "connect-src 'self' https://ws.audioscrobbler.com https://accounts.spotify.com https://api.spotify.com https://itunes.apple.com",
+      "connect-src 'self' https://ws.audioscrobbler.com https://accounts.spotify.com https://api.spotify.com https://itunes.apple.com https://cloudflareinsights.com",
       // Styles (Tailwind inline)
       "style-src 'self' 'unsafe-inline'",
       // Fonts

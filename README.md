@@ -1,14 +1,15 @@
-# 🎵 Sound Stars - Interactive Music Discovery Platform
+# 🎵 Discoverse - Interactive Music Discovery Platform
 
-Sound Stars is an interactive music discovery platform that visualizes artist connections in a beautiful, explorable star map. Discover new music through the relationships between your favorite artists using data from Last.fm and Spotify.
+Discoverse is an interactive music discovery platform that visualises artist connections in an explorable star map. Discover new music through the relationships between your favorite artists using data from Last.fm and Spotify.
 
-![Sound Stars Demo](https://img.shields.io/badge/Next.js-15-black?style=for-the-badge&logo=next.js)
+![Discoverse Demo](https://img.shields.io/badge/Next.js-15-black?style=for-the-badge&logo=next.js)
 ![React 19](https://img.shields.io/badge/React-19-blue?style=for-the-badge&logo=react)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-blue?style=for-the-badge&logo=typescript)
 
 ## ✨ Features
 
 ### 🎯 Interactive Music Graph
+
 - **Dynamic Force Graph**: Explore artist connections with a physics-based visualization
 - **Two Interaction Modes**:
   - 🗺️ **Map Mode**: Click nodes to expand and discover new connections
@@ -17,6 +18,7 @@ Sound Stars is an interactive music discovery platform that visualizes artist co
 - **Visual Clustering**: Artists grouped by genre with color-coded nodes
 
 ### 🎵 Rich Music Data
+
 - **Artist Information**: Comprehensive profiles with bio, stats, and genre tags
 - **Track Previews**: 30-second audio previews from Spotify with iTunes fallback
 - **High-Quality Images**: Artist photos from Spotify API
@@ -24,6 +26,7 @@ Sound Stars is an interactive music discovery platform that visualizes artist co
 - **Smart Recommendations**: Curated random artist suggestions for discovery
 
 ### 🎨 Beautiful Interface
+
 - **Glassmorphism Design**: Modern, translucent UI elements
 - **Responsive Layout**: Optimized for desktop and mobile devices
 - **Smooth Animations**: Framer Motion powered transitions
@@ -31,6 +34,7 @@ Sound Stars is an interactive music discovery platform that visualizes artist co
 - **Accessibility First**: Full keyboard navigation and screen reader support
 
 ### ⚡ Performance Optimized
+
 - **Server-Side Rendering**: Next.js 15 App Router with React Server Components
 - **Smart Caching**: Intelligent data caching with revalidation strategies
 - **Image Optimization**: Next.js Image component with remote pattern matching
@@ -49,12 +53,14 @@ Sound Stars is an interactive music discovery platform that visualizes artist co
 ### Installation
 
 1. **Clone the repository**
+
 ```bash
 git clone https://github.com/your-username/sound-stars.git
 cd sound-stars
 ```
 
 2. **Install dependencies**
+
 ```bash
 npm install
 # or
@@ -85,6 +91,7 @@ NEXT_PUBLIC_SITE_URL=https://your-domain.com
 - **Spotify API**: Create an app at [Spotify Developer Dashboard](https://developer.spotify.com/dashboard) (free)
 
 4. **Start the development server**
+
 ```bash
 npm run dev
 # or
@@ -150,18 +157,19 @@ The app supports flexible API configuration:
 ### Image Optimization
 
 Configured remote image patterns in `next.config.ts`:
+
 - Last.fm CDN domains
 - Spotify image CDN
 - Automatic optimization and caching
 
 ### Environment Variables
 
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `NEXT_PUBLIC_LASTFM_API_KEY` | Yes | Last.fm API key for artist data |
-| `SPOTIFY_CLIENT_ID` | No | Spotify app client ID |
-| `SPOTIFY_CLIENT_SECRET` | No | Spotify app client secret |
-| `NEXT_PUBLIC_SITE_URL` | No | Production site URL for absolute URLs |
+| Variable                     | Required | Description                           |
+| ---------------------------- | -------- | ------------------------------------- |
+| `NEXT_PUBLIC_LASTFM_API_KEY` | Yes      | Last.fm API key for artist data       |
+| `SPOTIFY_CLIENT_ID`          | No       | Spotify app client ID                 |
+| `SPOTIFY_CLIENT_SECRET`      | No       | Spotify app client secret             |
+| `NEXT_PUBLIC_SITE_URL`       | No       | Production site URL for absolute URLs |
 
 ## 🎯 Usage
 
@@ -176,7 +184,7 @@ Configured remote image patterns in `next.config.ts`:
 ### Advanced Features
 
 - **Genre-based filtering**: Nodes are colored by primary genre
-- **Connection strength**: Link thickness represents similarity strength  
+- **Connection strength**: Link thickness represents similarity strength
 - **Node sizing**: Size indicates artist popularity and connections
 - **Multi-depth expansion**: Discover artists up to 2 degrees of separation
 - **Smart caching**: Previous searches are cached for faster navigation
@@ -202,11 +210,13 @@ npm run type-check   # TypeScript type checking (if configured)
 ### Technology Stack
 
 **Core Framework:**
+
 - [Next.js 15](https://nextjs.org/) - React framework with App Router
 - [React 19](https://react.dev/) - UI library with Server Components
 - [TypeScript](https://www.typescriptlang.org/) - Type safety
 
 **Styling & UI:**
+
 - [Tailwind CSS 4](https://tailwindcss.com/) - Utility-first CSS
 - [shadcn/ui](https://ui.shadcn.com/) - Component library
 - [Radix UI](https://radix-ui.com/) - Headless UI primitives
@@ -214,15 +224,18 @@ npm run type-check   # TypeScript type checking (if configured)
 - [Lottie React](https://lottiefiles.com/web-player) - Lottie animations
 
 **Data Visualization:**
+
 - [react-force-graph-2d](https://github.com/vasturiano/react-force-graph-2d) - Interactive force-directed graphs
 - [D3.js](https://d3js.org/) (via force-graph) - Data-driven visualizations
 
 **APIs & Data:**
+
 - [Last.fm API](https://www.last.fm/api) - Music metadata and artist connections
 - [Spotify Web API](https://developer.spotify.com/documentation/web-api) - High-quality images and audio
 - [iTunes Search API](https://developer.apple.com/library/archive/documentation/AudioVideo/Conceptual/iTuneSearchAPI/) - Audio preview fallback
 
 **Development Tools:**
+
 - [ESLint 9](https://eslint.org/) - JavaScript/TypeScript linting
 - [Turbopack](https://turbo.build/pack) - Fast bundler for development
 
@@ -249,7 +262,7 @@ npm run type-check   # TypeScript type checking (if configured)
 The app supports deployment on any Node.js hosting platform:
 
 - **Netlify**: Configure build command and environment variables
-- **Railway**: Connect repository and set environment variables  
+- **Railway**: Connect repository and set environment variables
 - **DigitalOcean App Platform**: Use the Node.js app template
 - **Self-hosted**: Use `npm run build && npm run start`
 
@@ -259,7 +272,7 @@ Ensure these environment variables are set:
 
 ```env
 NEXT_PUBLIC_LASTFM_API_KEY=your_key
-SPOTIFY_CLIENT_ID=your_id  
+SPOTIFY_CLIENT_ID=your_id
 SPOTIFY_CLIENT_SECRET=your_secret
 NEXT_PUBLIC_SITE_URL=https://your-domain.com
 ```
@@ -318,4 +331,4 @@ This project is licensed under the MIT License. See the [LICENSE](LICENSE) file 
 
 **Built with ❤️ by [Your Name](https://github.com/your-username)**
 
-*Discover music like never before with Sound Stars* ⭐
+_Discover music like never before with Discoverse_ ⭐
