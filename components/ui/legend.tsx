@@ -14,7 +14,11 @@ export default function Legend() {
       <Popover.Root open={open} onOpenChange={setOpen}>
         <Popover.Trigger asChild>
           <button
-            className="flex items-center justify-center gap-1.5 rounded-lg border border-gray-700 bg-gray-800 backdrop-blur-md px-3 py-1.5 text-sm text-white transition-colors hover:text-white hover:bg-gray-800/50 cursor-pointer"
+            className={`flex items-center justify-center gap-1.5 rounded-lg border border-gray-700 backdrop-blur-md px-3 py-1.5 text-sm text-white transition-colors cursor-pointer hover:text-white ${
+              open
+                ? 'bg-gradient-to-br from-sky-600 via-blue-600 to-indigo-600'
+                : 'bg-gray-800 hover:bg-gray-800/50'
+            }`}
             aria-label="Show genre color legend"
           >
             <Palette className="h-3.5 w-3.5" />

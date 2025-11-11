@@ -470,7 +470,7 @@ export default function MusicMapApp({
   const overlayMessage = isExpanding
     ? 'Mapping connections...'
     : isClientGraphLoading
-    ? 'Building your music constellation...'
+    ? 'Building your music map...'
     : undefined;
   const showAnyOverlay = isExpanding || showOverlay || isClientGraphLoading;
 

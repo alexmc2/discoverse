@@ -18,7 +18,7 @@ interface LoadingScreenProps {
 }
 
 export default function LoadingScreen({
-  message = 'Building your music constellation...',
+  message = 'Building your music map...',
 }: LoadingScreenProps) {
   return (
     <motion.div

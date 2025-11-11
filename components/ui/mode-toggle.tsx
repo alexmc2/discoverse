@@ -37,7 +37,7 @@ export default function ModeToggle({
                 onClick={() => onModeChange('info')}
                 className={`px-3 py-1.5 text-sm transition-colors cursor-pointer ${
                   mode === 'info'
-                    ? 'text-white bg-gray-800'
+                    ? 'bg-gradient-to-br from-sky-600 via-blue-600 to-indigo-600 text-white'
                     : 'text-gray-400 hover:text-white hover:bg-gray-800/50'
                 }`}
               >
@@ -57,7 +57,7 @@ export default function ModeToggle({
                 onClick={() => onModeChange('map')}
                 className={`px-3 py-1.5 text-sm transition-colors border-l border-gray-800 cursor-pointer ${
                   mode === 'map'
-                    ? 'text-white bg-gray-800'
+                    ? 'bg-gradient-to-br from-sky-600 via-blue-600 to-indigo-600 text-white'
                     : 'text-gray-400 hover:text-white hover:bg-gray-800/50'
                 }`}
               >
