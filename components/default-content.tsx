@@ -23,7 +23,7 @@ export default function DefaultContent({
   randomArtists,
 }: DefaultContentProps) {
   return (
-    <div className="flex items-center justify-center h-full">
+    <div className="flex h-full w-full items-center justify-center">
       <div className="text-center sm:px-6 px-4 -mt-20 sm:-mt-20 md:-mt-64">
         <div className="relative mx-auto h-32 w-32 sm:h-40 sm:w-40">
           <Player
@@ -62,6 +62,7 @@ export default function DefaultContent({
             </button>
           ))}
         </div>
+        
       </div>
     </div>
   );

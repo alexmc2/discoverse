@@ -3,6 +3,7 @@
 
 import { LocateFixed, AudioLines } from 'lucide-react';
 import SearchBar from '@/components/search-bar';
+import AboutButton from '@/components/ui/about-button';
 
 interface HeaderProps {
   onSearch: (artistName: string) => void;
@@ -101,6 +102,18 @@ export default function Header({
               </button>
             </div>
           )}
+        </div>
+
+        {/* About button */}
+        <div className="hidden sm:flex mt-3">
+          <AboutButton
+            aria-label="Learn more about Discoverse"
+            className="self-start"
+          />
+        </div>
+
+        <div className="sm:hidden mt-3">
+          <AboutButton aria-label="Learn more about Discoverse" />
         </div>
 
         {error && (
