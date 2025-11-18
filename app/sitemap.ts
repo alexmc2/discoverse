@@ -1,5 +1,6 @@
 // app/sitemap.ts
 import { POPULAR_ARTISTS_POOL } from '@/lib/popular-artists';
+import { getTopChartArtistNames } from '@/lib/lastfm';
 import type { MetadataRoute } from 'next';
 
 // Ensure CF/edge does not cache this route
@@ -9,7 +10,7 @@ const POPULAR_SEARCH_SITEMAP_LIMIT = 50; // keep sitemap lean with a capped quer
 
 // Keep the sitemap minimal and always fresh with correct Content-Type.
 
-export default function sitemap(): MetadataRoute.Sitemap {
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const base = new URL('https://discoverse.co.uk');
   const now = new Date();
 
@@ -30,8 +31,19 @@ export default function sitemap(): MetadataRoute.Sitemap {
     },
   ];
 
+  let popularSearches: string[] = [];
+  try {
+    popularSearches = await getTopChartArtistNames(POPULAR_SEARCH_SITEMAP_LIMIT);
+  } catch {
+    popularSearches = POPULAR_ARTISTS_POOL.slice(0, POPULAR_SEARCH_SITEMAP_LIMIT);
+  }
+
   const popularSearchRoutes: MetadataRoute.Sitemap = Array.from(
-    new Set(POPULAR_ARTISTS_POOL),
+    new Set(
+      popularSearches
+        .map((name) => name.trim())
+        .filter((name): name is string => !!name),
+    ),
   )
     .slice(0, POPULAR_SEARCH_SITEMAP_LIMIT)
     .map((artist) => {

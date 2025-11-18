@@ -56,6 +56,13 @@ type LfTopTracksResp = {
     }>;
   };
 };
+type LfChartTopArtistsResp = {
+  artists?: {
+    artist?: Array<{
+      name?: string;
+    }>;
+  };
+};
 
 /** ===== Public model types ===== */
 
@@ -257,6 +264,18 @@ export async function getTopTracks(
     url: track.url || '',
     artist: track.artist?.name || artistName,
   }));
+}
+
+export async function getTopChartArtistNames(limit = 50): Promise<string[]> {
+  const data = await lastfmGet<LfChartTopArtistsResp>(
+    'chart.gettopartists',
+    { limit },
+    6 * 60 * 60
+  );
+  const artists = data?.artists?.artist ?? [];
+  return (artists || [])
+    .map((artist) => artist?.name?.trim())
+    .filter((name): name is string => !!name && name.length > 0);
 }
 
 /** ===== Image + Listeners memos (type-safe, no `any`) ===== */
