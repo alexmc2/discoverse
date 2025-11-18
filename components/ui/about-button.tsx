@@ -22,5 +22,6 @@ export default function AboutButton({ className, ...props }: AboutButtonProps) {
       <span className="absolute inset-0 bg-gradient-to-br from-sky-600 via-blue-600 to-indigo-600 opacity-0 transition-opacity duration-300 ease-out group-hover:opacity-100 group-focus-visible:opacity-100" />
       <span className="relative z-10 text-base leading-none text-slate-200 font-serif">i</span>
     </Link>
+    
   );
 }
