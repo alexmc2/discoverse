@@ -25,9 +25,9 @@ export function AboutContent() {
 
       <p className="mb-4 text-base sm:text-lg text-slate-300/90">
         Discoverse is an interactive music discovery platform that visualises
-        artist connections in an explorable star map. Discover new music through
-        the relationships between your favorite artists using data from Last.fm
-        and Spotify.
+        artist connections in an explorable music map. Discover new music
+        through the relationships between your favorite artists using data from
+        Last.fm and Spotify.
       </p>
 
       <p className="mb-4 text-sm sm:text-lg text-slate-300/90">

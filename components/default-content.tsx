@@ -45,7 +45,7 @@ export default function DefaultContent({
 
         <p className="text-gray-400 max-w-md mx-auto mb-8">
           See how artists connect through genres and influences in an
-          interactive star map. Listen to top tracks.
+          interactive music map. Listen to top tracks.
         </p>
 
         <div className="flex flex-wrap gap-2 justify-center min-h-[44px]">
@@ -62,7 +62,6 @@ export default function DefaultContent({
             </button>
           ))}
         </div>
-        
       </div>
     </div>
   );
