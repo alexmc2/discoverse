@@ -54,5 +54,5 @@ next-env.d.ts
 
 /.wrangler/
 
-AGENTS.md
-CLAUDE.md
+/AGENTS.md
+/CLAUDE.md
