@@ -4,6 +4,8 @@
 /node_modules
 /.pnp
 .pnp.*
+.eslintcache
+/.turbo
 .yarn/*
 !.yarn/patches
 !.yarn/plugins
@@ -16,13 +18,19 @@
 # next.js
 /.next/
 /out/
+/.open-next/
 
 # production
 /build
 
 # misc
 .DS_Store
+.idea/
+.vscode/
 *.pem
+*.log
+*.swo
+*.swp
 
 # debug
 npm-debug.log*
@@ -32,6 +40,7 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+.dev.vars
 
 # vercel
 .vercel
@@ -40,11 +49,10 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-.env
-.env.local  
-.dev.vars
 # Generated Claude Code configurations
 .claude/
 
-/.open-next/
 /.wrangler/
+
+AGENTS.md
+CLAUDE.md
