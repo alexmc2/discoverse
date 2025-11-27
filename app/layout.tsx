@@ -19,7 +19,7 @@ export const metadata: Metadata = {
   description:
     'Discoverse is an interactive music discovery app. Explore a visual map of artists, genres and influences, find similar artists, and listen to track previews using data from Last.fm and Spotify.',
   keywords:
-    'music discovery app, musicsimilar artists, artist map, interactive music map, last.fm, spotify, music visualisation, music graph, artist network',
+    'music discovery app, music similar artists, artist map, interactive music map, last.fm, spotify, music visualisation, music graph, artist network',
   authors: [{ name: 'Discoverse' }],
   icons: {
     icon: [
