@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input';
 interface SearchBarProps {
   onSearch: (artist: string) => void;
   isLoading?: boolean;
-  resetSignal?: number; // ← NEW
+  resetSignal?: number; 
 }
 
 export default function SearchBar({

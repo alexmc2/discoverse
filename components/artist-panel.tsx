@@ -14,7 +14,7 @@ import {
   Volume2,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-// no visual tooltips; use screen reader labels on controls
+
 
 export interface ArtistDetails {
   name: string;
@@ -398,7 +398,7 @@ export default function ArtistPanel({
                       </button>
                     )}
 
-                    {/* NEW: View on Spotify button (above Last.fm) */}
+   
                     {artist?.spotifyUrl && (
                       <a
                         href={artist.spotifyUrl}

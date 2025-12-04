@@ -49,7 +49,7 @@ const lightenHex = (hex: string, strength = 0.45): string => {
 type RFNode = NodeObject<ForceGraphNode>;
 type RFLink = LinkObject<ForceGraphNode, ForceGraphLink>;
 
-/** ===== Visual tuning knobs (easy to tweak) ===== */
+/** ===== Visual tuning knobs ===== */
 const CENTER_SIZE_BOOST = 1.1; // slight bump for the focused node
 const CENTER_MIN_RADIUS = 12; // keeps center from looking tiny after refresh
 // const GLOW_RADIUS_FACTOR = 1.2; // size of glow halo (not bigger; we keep this)
@@ -157,7 +157,7 @@ export default function MusicGraph({
     return () => clearTimeout(t);
   }, [centerNodeName, data.nodes, recenterSignal]);
 
-  // kinetic panning (unchanged)
+  // kinetic panning 
   useEffect(() => {
     const fg = graphRef.current;
     if (!fg) return;

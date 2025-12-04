@@ -3,7 +3,7 @@
 
 import dynamic from 'next/dynamic';
 
-// Reuse the same Lottie setup as the homepage
+
 const Player = dynamic(
   () =>
     import('@lottiefiles/react-lottie-player').then((mod) => ({

@@ -10,7 +10,7 @@ import DefaultContent from '@/components/default-content';
 import ModeToggle from '@/components/ui/mode-toggle';
 import Legend from '@/components/ui/legend';
 import ArtistPanel from '@/components/artist-panel';
-import BuyMeACoffee from '@/components/ui/buy-me-a-coffee';
+// import BuyMeACoffee from '@/components/ui/buy-me-a-coffee';
 import type { GraphNode, GraphLink } from '@/lib/lastfm';
 import {
   buildGraphData,
@@ -526,8 +526,10 @@ export default function MusicMapApp({
         </>
       )}
 
-      {/* Support button (hide on default/landing). Hidden on small screens when the panel is open to avoid overlap. */}
+      {/* Support button (hide on default/landing). Hidden on small screens when the panel is open to avoid overlap. Temporarily disabled. */}
+      {/*
       {hasSearchedFromUrl && hasData && <BuyMeACoffee panelOpen={panelOpen} />}
+      */}
 
       {panelOpen && (
         <ArtistPanel
