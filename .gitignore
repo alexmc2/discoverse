@@ -56,3 +56,5 @@ next-env.d.ts
 
 /AGENTS.md
 /CLAUDE.md
+
+add_file_paths.sh
