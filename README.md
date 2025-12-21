@@ -2,6 +2,7 @@
 
 Discoverse is an interactive music discovery platform that visualises artist connections in an explorable music map. Discover new music through the relationships between your favorite artists using data from Last.fm and Spotify.
 
+
 ![Discoverse Demo](https://img.shields.io/badge/Next.js-15-black?style=for-the-badge&logo=next.js)
 ![React 19](https://img.shields.io/badge/React-19-blue?style=for-the-badge&logo=react)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-blue?style=for-the-badge&logo=typescript)

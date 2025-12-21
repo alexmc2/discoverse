@@ -18,9 +18,10 @@
     "axios": "^1.11.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "fix-react2shell-next": "^1.1.4",
     "framer-motion": "^12.23.12",
     "lucide-react": "^0.541.0",
-    "next": "15.5.7",
+    "next": "15.5.9",
     "react": "19.2.1",
     "react-dom": "19.2.1",
     "react-force-graph-2d": "^1.28.0",
@@ -28,6 +29,7 @@
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
+    "@opennextjs/cloudflare": "^1.6.5",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
@@ -37,7 +39,6 @@
     "tailwindcss": "^4",
     "tw-animate-css": "^1.3.7",
     "typescript": "^5",
-    "wrangler": "^4.33.1",
-    "@opennextjs/cloudflare": "^1.6.5"
+    "wrangler": "^4.33.1"
   }
 }
