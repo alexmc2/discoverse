@@ -157,7 +157,7 @@ export default function MusicGraph({
     return () => clearTimeout(t);
   }, [centerNodeName, data.nodes, recenterSignal]);
 
-  // kinetic panning 
+  // kinetic panning
   useEffect(() => {
     const fg = graphRef.current;
     if (!fg) return;

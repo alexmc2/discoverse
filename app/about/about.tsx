@@ -3,7 +3,6 @@
 
 import dynamic from 'next/dynamic';
 
-
 const Player = dynamic(
   () =>
     import('@lottiefiles/react-lottie-player').then((mod) => ({
@@ -14,8 +13,8 @@ const Player = dynamic(
 
 export function AboutContent() {
   return (
-    <div className="max-w-5xl w-full text-center">
-      <h1 className="text-3xl sm:text-4xl font-semibold text-slate-100 mb-4">
+    <div className="max-w-4xl w-full text-center">
+      <h1 className="text-3xl sm:text-4xl font-semibold text-slate-100 mb-6">
         About Discoverse
       </h1>
 
@@ -30,14 +29,14 @@ export function AboutContent() {
         Last.fm and Spotify.
       </p>
 
-      <p className="mb-4 text-sm sm:text-lg text-slate-300/90">
+      <p className="mb-4 text-base sm:text-lg text-slate-300/90">
         Start with an artist you already know, then explore similar artists on a
         force-directed map. Click on any artist image to open info panel that
         contains bios, tags and track previews where available. The app is built
         with Next.js and TypeScript, leveraging the Last.fm and Spotify APIs for
         data.
       </p>
-      <p className=" text-sm sm:text-lg text-slate-300/90">
+      <p className=" text-base sm:text-lg text-slate-300/90">
         Are you looking for a Next.js developer to build your next web
         application? I&apos;m currently available for freelance projects. Visit
         my website at{' '}
