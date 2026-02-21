@@ -2,8 +2,10 @@
 import { ImageResponse } from 'next/og';
 import type { NextRequest } from 'next/server';
 
-// Note: Avoid edge runtime for OpenNext Cloudflare bundle.
-// Default to nodejs_compat (Workers) by omitting `runtime = 'edge'`.
+// Keep this dynamic to avoid build-time prerender attempts.
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);

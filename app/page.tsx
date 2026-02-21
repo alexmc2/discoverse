@@ -1,6 +1,7 @@
 // app/page.tsx
 import MusicMapApp from '@/components/music-map-app';
-import { getRandomArtists } from '@/lib/server/artists';
+import { getDefaultArtistBootstrap } from '@/lib/server/artists';
+import { getRandomArtists } from '@/lib/server/random-artists';
 
 interface PageProps {
   params: Promise<Record<string, string | string[] | undefined>>;
@@ -28,13 +29,14 @@ export default async function Home({ searchParams }: PageProps) {
     );
   }
 
-  // To avoid Cloudflare Worker subrequest limits during SSR,
-  // do not prefetch graph or panel on the server. The client will load them.
+  // Fast path: for default suggested artists, hydrate from precomputed cache.
+  // Non-default searches still load on the client to avoid SSR subrequest limits.
+  const defaultBootstrap = await getDefaultArtistBootstrap(seedArtist);
   return (
     <MusicMapApp
       seedArtist={seedArtist}
-      initialGraphData={null}
-      panelData={null}
+      initialGraphData={defaultBootstrap?.graphData ?? null}
+      panelData={defaultBootstrap?.panelData ?? null}
       randomArtists={randomArtists}
     />
   );

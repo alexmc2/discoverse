@@ -123,38 +123,59 @@ export default function MusicGraph({
         | undefined;
       center?.strength(0.05);
       // Only perform an automatic fit once on first data load.
+      // If we already have a focused artist, auto-fit would override the
+      // center-on-artist behavior, so skip fit in that case.
       if (!didInitialFitRef.current) {
-        setTimeout(() => graphRef.current?.zoomToFit(400, 50), 500);
         didInitialFitRef.current = true;
+        if (!centerNodeName) {
+          setTimeout(() => graphRef.current?.zoomToFit(400, 50), 500);
+        }
       }
     }
-  }, [data]);
+  }, [data, centerNodeName]);
 
   // recentre on current artist when center changes or user presses the button
   useEffect(() => {
     if (!centerNodeName || !graphRef.current) return;
-    const t = setTimeout(() => {
-      const fg = graphRef.current!;
+
+    const fg = graphRef.current;
+    let attempts = 0;
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+    let cancelled = false;
+    const maxAttempts = 20;
+    const attemptDelayMs = 120;
+
+    const centerAndZoom = (n: ForceGraphNode) => {
+      fg.centerAt((n.x as number) ?? 0, (n.y as number) ?? 0, 900);
+      fg.zoom(2, 900);
+    };
+
+    const tryCenter = () => {
+      if (cancelled) return;
+
       const node = data.nodes.find((n) => n.name === centerNodeName) as
         | ForceGraphNode
         | undefined;
-      const centerAndZoom = (n: ForceGraphNode) => {
-        fg.centerAt((n.x as number) ?? 0, (n.y as number) ?? 0, 900);
-        fg.zoom(2, 900);
-      };
-      if (!node || node.x == null || node.y == null) {
-        setTimeout(() => {
-          const retry = data.nodes.find((n) => n.name === centerNodeName) as
-            | ForceGraphNode
-            | undefined;
-          if (retry && retry.x != null && retry.y != null) centerAndZoom(retry);
-          else fg.zoomToFit(600, 60);
-        }, 300);
+
+      if (node && node.x != null && node.y != null) {
+        centerAndZoom(node);
         return;
       }
-      centerAndZoom(node);
-    }, 120);
-    return () => clearTimeout(t);
+
+      attempts += 1;
+      if (attempts >= maxAttempts) {
+        fg.zoomToFit(600, 60);
+        return;
+      }
+
+      timeoutId = setTimeout(tryCenter, attemptDelayMs);
+    };
+
+    timeoutId = setTimeout(tryCenter, 120);
+    return () => {
+      cancelled = true;
+      if (timeoutId) clearTimeout(timeoutId);
+    };
   }, [centerNodeName, data.nodes, recenterSignal]);
 
   // kinetic panning
@@ -515,7 +536,7 @@ export default function MusicGraph({
         cooldownTicks={100}
         onEngineStop={() => {
           // Avoid overriding user focus after expansions; only fit once
-          if (!didInitialFitRef.current) {
+          if (!didInitialFitRef.current && !centerNodeName) {
             graphRef.current?.zoomToFit(400, 50);
             didInitialFitRef.current = true;
           }

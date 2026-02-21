@@ -219,7 +219,6 @@ function detectMarketPriority(): string[] {
 }
 
 /** ====== Public: search + images + url ====== */
-import { cacheJSON, cacheKey, getCached, setCached } from './server/cache';
 
 export async function searchSpotifyArtist(
   artistName: string
@@ -231,12 +230,7 @@ export async function searchSpotifyArtist(
     artistName
   )}&type=artist&limit=1`;
 
-  const key = cacheKey(['sp', 'search', artistName.toLowerCase()]);
-  const data = await cacheJSON<SpotifySearchResponse | null>(
-    key,
-    12 * 60 * 60,
-    async () => await spotifyGET<SpotifySearchResponse>(url, token)
-  );
+  const data = await spotifyGET<SpotifySearchResponse>(url, token);
   return data?.artists.items?.[0] ?? null;
 }
 
@@ -366,10 +360,6 @@ export async function getArtistTopTracks(
     ? [marketHint, ...detectMarketPriority().filter((m) => m !== marketHint)]
     : detectMarketPriority();
 
-  const cacheBase = cacheKey(['sp', 'top-tracks', artist.id]);
-  const cached = await getCached<SpotifyTrack[]>(cacheBase);
-  if (cached && cached.length) return cached;
-
   let tracks: SpotifyTrack[] = [];
   for (const market of marketOrder) {
     const url = `https://api.spotify.com/v1/artists/${artist.id}/top-tracks?market=${market}`;
@@ -404,8 +394,5 @@ export async function getArtistTopTracks(
     await enrichWithITunesPreviews(artistName, tracks);
   }
 
-  const final = tracks.slice(0, 10);
-  // Best-effort write-through cache; ignore failures
-  setCached<SpotifyTrack[]>(cacheBase, final, 12 * 60 * 60).catch(() => {});
-  return final;
+  return tracks.slice(0, 10);
 }

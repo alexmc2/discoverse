@@ -146,6 +146,40 @@ async function lastfmGet<T>(
   });
 }
 
+const LASTFM_METHOD_TTLS: Record<string, number> = {
+  'artist.search': 6 * 60 * 60,
+  'artist.getsimilar': 12 * 60 * 60,
+  'artist.gettoptags': 24 * 60 * 60,
+  'artist.getinfo': 24 * 60 * 60,
+  'artist.gettoptracks': 12 * 60 * 60,
+  'chart.gettopartists': 6 * 60 * 60,
+};
+
+export const SUPPORTED_LASTFM_METHODS = [
+  'artist.search',
+  'artist.getsimilar',
+  'artist.gettoptags',
+  'artist.getinfo',
+  'artist.gettoptracks',
+  'chart.gettopartists',
+] as const;
+
+export type SupportedLastfmMethod = (typeof SUPPORTED_LASTFM_METHODS)[number];
+
+export function isSupportedLastfmMethod(
+  method: string
+): method is SupportedLastfmMethod {
+  return (SUPPORTED_LASTFM_METHODS as readonly string[]).includes(method);
+}
+
+export async function getLastfmMethodData(
+  method: SupportedLastfmMethod,
+  params: Record<string, string | number> = {}
+): Promise<unknown> {
+  const ttl = LASTFM_METHOD_TTLS[method] ?? 6 * 60 * 60;
+  return lastfmGet<unknown>(method, params, ttl);
+}
+
 /** ===== Public API ===== */
 
 // Filter out tiny artists (default: min 50 listeners) for cleaner suggestions.
