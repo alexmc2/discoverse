@@ -12,11 +12,11 @@ interface HeaderProps {
   hasData: boolean;
   onClearData: () => void;
   error: string | null;
-  mode: 'map' | 'info'; // kept for future, not used here
-  onModeChange: (mode: 'map' | 'info') => void; // kept for future, not used here
+  mode: 'map' | 'info'; 
+  onModeChange: (mode: 'map' | 'info') => void; 
   resetSignal?: number; // used to tell SearchBar to clear & collapse
 
-  // NEW — control the recenter button under the search bar
+  // control the recenter button under the search bar
   showRecenter?: boolean;
   canRecenter?: boolean;
   onRecenter?: () => void;

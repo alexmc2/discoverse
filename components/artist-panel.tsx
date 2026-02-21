@@ -180,6 +180,9 @@ export default function ArtistPanel({
     return `${m}:${String(s).padStart(2, '0')}`;
   };
 
+  const topTracks = tracks.slice(0, 10);
+  const hasAnyPlayablePreview = topTracks.some((track) => !!track.preview_url);
+
   return (
     <AnimatePresence>
       {artistName && (
@@ -313,7 +316,7 @@ export default function ArtistPanel({
                       </div>
 
                       <div className="space-y-2">
-                        {tracks.slice(0, 10).map((track) => {
+                        {topTracks.map((track) => {
                           const canPlay = !!track.preview_url;
                           const isThisPlaying =
                             playingTrackId === track.id && isPlaying;
@@ -364,6 +367,12 @@ export default function ArtistPanel({
                           );
                         })}
                       </div>
+
+                      {trackSource === 'spotify' && !hasAnyPlayablePreview && (
+                        <p className="mt-2 text-[11px] text-gray-500">
+                          No 30-second previews are currently available for these tracks.
+                        </p>
+                      )}
 
                       <p className="mt-2 text-[11px] text-gray-500">
                         Source:{' '}

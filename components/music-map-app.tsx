@@ -218,7 +218,9 @@ export default function MusicMapApp({
     }
   }, [isPending]);
 
-  const [graph, setGraph] = useState<GraphData>({ nodes: [], links: [] });
+  const [graph, setGraph] = useState<GraphData>(
+    () => initialGraphData ?? { nodes: [], links: [] }
+  );
   const firstLoadRef = useRef(true);
   const restoredFromCacheRef = useRef(false);
   const storageVersion = 'v1';
@@ -334,7 +336,22 @@ export default function MusicMapApp({
       activePanelArtist === seedArtist &&
       panelData
     ) {
-      setClientPanelData(panelData);
+      const hasSpotifyTracksWithoutPreviews =
+        panelData.trackSource === 'spotify' &&
+        panelData.tracks.length > 0 &&
+        panelData.tracks.every((t) => !t.preview_url);
+
+      if (hasSpotifyTracksWithoutPreviews) {
+        // Use cached artist metadata immediately, but avoid showing stale
+        // unplayable tracks while fresh Spotify/iTunes previews are fetched.
+        setClientPanelData({
+          artist: panelData.artist,
+          tracks: [],
+          trackSource: null,
+        });
+      } else {
+        setClientPanelData(panelData);
+      }
     }
   }, [panelOpen, activePanelArtist, seedArtist, panelData]);
 

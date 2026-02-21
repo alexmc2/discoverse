@@ -5,6 +5,8 @@ import {
   getArtistInfo,
   getTopTracks as getLastFmTopTracks,
   buildGraphData as buildGraph,
+  type GraphLink,
+  type GraphNode,
 } from '@/lib/lastfm';
 import {
   getArtistImage,
@@ -39,6 +41,42 @@ export interface TrackData {
 }
 
 type TrackSource = 'spotify' | 'lastfm' | null;
+
+export interface GraphData {
+  nodes: GraphNode[];
+  links: GraphLink[];
+}
+
+interface CachedArtistEntry {
+  graphData?: GraphData;
+  panelData?: {
+    artist: ArtistDetails | null;
+    tracks: TrackData[];
+    trackSource: TrackSource;
+  };
+  lastUpdated?: string;
+}
+
+type CachedArtistIndex = Record<string, CachedArtistEntry>;
+
+const DEFAULT_ARTIST_SET = new Set(
+  POPULAR_ARTISTS_POOL.map((artist) => artist.trim().toLowerCase())
+);
+
+let cachedArtistIndexPromise: Promise<CachedArtistIndex | null> | null = null;
+
+function normalizeArtistName(artistName: string): string {
+  return artistName.trim().toLowerCase();
+}
+
+async function loadCachedArtistIndex(): Promise<CachedArtistIndex | null> {
+  if (!cachedArtistIndexPromise) {
+    cachedArtistIndexPromise = import('@/data/artist-cache.json')
+      .then((mod) => mod.default as CachedArtistIndex)
+      .catch(() => null);
+  }
+  return cachedArtistIndexPromise;
+}
 
 export async function fetchGraphData(artistName: string) {
   return await buildGraph(artistName, 2);
@@ -83,11 +121,27 @@ export async function fetchArtistData(artistName: string) {
   return { artist, tracks, trackSource };
 }
 
-export async function getRandomArtists(count: number = 4): Promise<string[]> {
-  const shuffled = [...POPULAR_ARTISTS_POOL];
-  for (let i = shuffled.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+export async function getDefaultArtistBootstrap(artistName: string): Promise<{
+  graphData: GraphData;
+  panelData: {
+    artist: ArtistDetails | null;
+    tracks: TrackData[];
+    trackSource: TrackSource;
+  } | null;
+} | null> {
+  const normalized = normalizeArtistName(artistName);
+  if (!normalized || !DEFAULT_ARTIST_SET.has(normalized)) {
+    return null;
   }
-  return shuffled.slice(0, count);
+
+  const index = await loadCachedArtistIndex();
+  if (!index) return null;
+
+  const cached = index[normalized];
+  if (!cached?.graphData) return null;
+
+  return {
+    graphData: cached.graphData,
+    panelData: cached.panelData ?? null,
+  };
 }
