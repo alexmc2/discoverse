@@ -5,7 +5,8 @@ All notable changes to this project will be documented in this file.
 ## [2026-03-02]
 
 ### Added
-- Added `app/api/search-cache/route.ts` to provide shared KV-backed cache reads/writes for graph and panel payloads by artist name.
+- Added `lib/server/search-cache.ts` server action for authenticated cache writes, replacing the unauthenticated POST endpoint.
+- Added `app/api/search-cache/route.ts` to provide shared KV-backed cache reads for graph and panel payloads by artist name.
 - Added stale-while-revalidate cache metadata and response fields (`stale`, `cachedAt`) for global search-cache entries.
 - Added configurable soft/hard TTL environment variables for shared search cache:
   - `SEARCH_CACHE_GRAPH_TTL_SECONDS`
@@ -23,11 +24,12 @@ All notable changes to this project will be documented in this file.
   - `lib/spotify.ts` now reads top-tracks archive from KV key `archive:top-tracks:v1`.
   - `lib/server/artists.ts` now reads artist bootstrap archive from KV key `archive:artist-cache:v1`.
 - Updated `lib/server/cache.ts` KV binding resolution to use Cloudflare context (`Symbol.for('__cloudflare-context__')`) with legacy global fallback.
-- Updated `next.config.mjs` to initialize OpenNext Cloudflare context in local dev via `initOpenNextCloudflareForDev()`.
-- Updated `components/music-map-app.tsx` to use shared cache-first lookups for graph and panel data, with background refresh on stale hits.
+- Updated `next.config.mjs` to gate `@opennextjs/cloudflare` dev helper behind `NODE_ENV !== 'production'` with dynamic import, avoiding devDependency failure in production.
+- Updated `components/music-map-app.tsx` to use shared cache-first lookups for graph and panel data, with background refresh on stale hits. Cache writes now use a server action instead of a direct POST fetch.
 - Updated archive loaders in `lib/spotify.ts` and `lib/server/artists.ts` to retry on future requests when a previous KV read returned null.
 
 ### Fixed
+- Fixed Spotify `spotifyGET` circuit breaker not tripping after exhausting 429 retry attempts, causing repeated rate-limited requests without cooloff.
 - Fixed Cloudflare deploy-time worker size failure (`10027`) by moving large archive payloads out of the worker bundle.
 - Reduced dry-run upload bundle size to ~`gzip: 1992 KiB` (under free-plan 3 MiB script limit).
 - Fixed local/remote KV upload ambiguity for bindings that include both `id` and `preview_id` by using explicit `--preview true|false`.

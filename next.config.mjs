@@ -1,7 +1,9 @@
 // next.config.mjs
-import { initOpenNextCloudflareForDev } from '@opennextjs/cloudflare';
-
-initOpenNextCloudflareForDev();
+if (process.env.NODE_ENV !== 'production') {
+  import('@opennextjs/cloudflare').then(({ initOpenNextCloudflareForDev }) =>
+    initOpenNextCloudflareForDev()
+  ).catch(() => {});
+}
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {

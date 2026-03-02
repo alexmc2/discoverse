@@ -243,15 +243,8 @@ async function writeSharedSearchCache<T>(
   data: T
 ): Promise<void> {
   try {
-    await fetch('/api/search-cache', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        type,
-        artist: artistName,
-        data,
-      }),
-    });
+    const { writeSearchCache } = await import('@/lib/server/search-cache');
+    await writeSearchCache(type, artistName, data);
   } catch {
     // best effort
   }

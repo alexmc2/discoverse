@@ -219,6 +219,7 @@ async function spotifyGET<T>(url: string, token: string): Promise<T | null> {
     }
   }
 
+  noteFailure();
   return null;
 }
 
