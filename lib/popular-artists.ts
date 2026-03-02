@@ -21,7 +21,7 @@ export const POPULAR_ARTISTS_POOL = [
   'Daft Punk',
   'The Smiths',
   'Joy Division',
-  'Micheal Jackson',
+  'Michael Jackson',
   'Frank Ocean',
   'The Weeknd',
   'J. Cole',

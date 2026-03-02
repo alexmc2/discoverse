@@ -1,4 +1,10 @@
 // next.config.mjs
+if (process.env.NODE_ENV !== 'production') {
+  import('@opennextjs/cloudflare').then(({ initOpenNextCloudflareForDev }) =>
+    initOpenNextCloudflareForDev()
+  ).catch(() => {});
+}
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   images: {

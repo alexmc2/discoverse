@@ -58,3 +58,7 @@ next-env.d.ts
 /CLAUDE.md
 
 add_file_paths.sh
+
+archive*
+
+development-notes/*

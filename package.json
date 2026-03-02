@@ -9,7 +9,10 @@
     "preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
     "deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy",
     "lint": "eslint",
-    "refresh:artist-cache": "node --experimental-strip-types --import ./scripts/register-ts-loader.mjs scripts/refresh-artist-cache.mjs"
+    "refresh:artist-cache": "node --experimental-strip-types --import ./scripts/register-ts-loader.mjs scripts/refresh-artist-cache.mjs",
+    "build:top-tracks-archive": "python3 scripts/build-top-tracks-archive.py --overwrite",
+    "kv:upload-archives": "node scripts/upload-archives-to-kv.mjs",
+    "kv:upload-archives:dry": "node scripts/upload-archives-to-kv.mjs --dry-run"
   },
   "dependencies": {
     "@lottiefiles/react-lottie-player": "^3.6.0",
