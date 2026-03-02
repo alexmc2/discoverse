@@ -14,6 +14,7 @@ import {
   getArtistSpotifyUrl, // <-- now exported
 } from '@/lib/spotify';
 import { POPULAR_ARTISTS_POOL } from '@/lib/popular-artists';
+import { getMusicCacheKV } from '@/lib/server/cache';
 // No caching here: keep randomization per request. Heavy lookups are cached elsewhere.
 
 export interface ArtistDetails {
@@ -64,6 +65,7 @@ const DEFAULT_ARTIST_SET = new Set(
 );
 
 let cachedArtistIndexPromise: Promise<CachedArtistIndex | null> | null = null;
+const ARTIST_CACHE_KV_KEY = process.env.ARTIST_CACHE_KV_KEY || 'archive:artist-cache:v1';
 
 function normalizeArtistName(artistName: string): string {
   return artistName.trim().toLowerCase();
@@ -71,11 +73,24 @@ function normalizeArtistName(artistName: string): string {
 
 async function loadCachedArtistIndex(): Promise<CachedArtistIndex | null> {
   if (!cachedArtistIndexPromise) {
-    cachedArtistIndexPromise = import('@/data/artist-cache.json')
-      .then((mod) => mod.default as CachedArtistIndex)
-      .catch(() => null);
+    cachedArtistIndexPromise = (async () => {
+      try {
+        const kv = await getMusicCacheKV();
+        if (!kv) return null;
+        const raw = await kv.get(ARTIST_CACHE_KV_KEY);
+        if (!raw) return null;
+        return JSON.parse(raw) as CachedArtistIndex;
+      } catch {
+        return null;
+      }
+    })();
   }
-  return cachedArtistIndexPromise;
+  const index = await cachedArtistIndexPromise;
+  if (!index) {
+    // Allow retry on later requests if KV was temporarily empty/unavailable.
+    cachedArtistIndexPromise = null;
+  }
+  return index;
 }
 
 export async function fetchGraphData(artistName: string) {

@@ -53,6 +53,8 @@ interface GraphData {
   links: GraphLink[];
 }
 
+type SearchCacheType = 'graph' | 'panel';
+
 const MusicGraph = dynamic(() => import('@/components/music-graph'), {
   ssr: false,
   loading: () => <LoadingScreen message="Initializing graph engine..." />,
@@ -186,6 +188,147 @@ async function fetchPanelDataClient(artistName: string): Promise<PanelData> {
   return { artist, tracks, trackSource };
 }
 
+function isGraphData(value: unknown): value is GraphData {
+  if (!value || typeof value !== 'object') return false;
+  const v = value as Partial<GraphData>;
+  return Array.isArray(v.nodes) && Array.isArray(v.links);
+}
+
+function isPanelData(value: unknown): value is PanelData {
+  if (!value || typeof value !== 'object') return false;
+  const v = value as Partial<PanelData>;
+  return Array.isArray(v.tracks);
+}
+
+type SharedSearchCacheRead<T> = {
+  data: T | null;
+  stale: boolean;
+};
+
+const graphRefreshInFlight = new Map<string, Promise<void>>();
+const panelRefreshInFlight = new Map<string, Promise<void>>();
+
+function normalizeCacheArtistKey(name: string): string {
+  return name.trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
+async function readSharedSearchCache<T>(
+  type: SearchCacheType,
+  artistName: string
+): Promise<SharedSearchCacheRead<T>> {
+  try {
+    const res = await fetch(
+      `/api/search-cache?type=${encodeURIComponent(type)}&artist=${encodeURIComponent(artistName)}`,
+      { cache: 'no-store' }
+    );
+    if (!res.ok) return { data: null, stale: false };
+    const payload = (await res.json()) as {
+      hit?: boolean;
+      stale?: boolean;
+      data?: T | null;
+    };
+    if (!payload.hit) return { data: null, stale: false };
+    return {
+      data: payload.data ?? null,
+      stale: !!payload.stale,
+    };
+  } catch {
+    return { data: null, stale: false };
+  }
+}
+
+async function writeSharedSearchCache<T>(
+  type: SearchCacheType,
+  artistName: string,
+  data: T
+): Promise<void> {
+  try {
+    await fetch('/api/search-cache', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        type,
+        artist: artistName,
+        data,
+      }),
+    });
+  } catch {
+    // best effort
+  }
+}
+
+function scheduleGraphRefresh(artistName: string): void {
+  const key = normalizeCacheArtistKey(artistName);
+  if (graphRefreshInFlight.has(key)) return;
+
+  const task = (async () => {
+    const fresh = await buildGraphData(artistName, 2);
+    if (fresh.nodes.length) {
+      await writeSharedSearchCache('graph', artistName, fresh);
+    }
+  })()
+    .catch(() => {
+      // best effort
+    })
+    .finally(() => {
+      graphRefreshInFlight.delete(key);
+    });
+
+  graphRefreshInFlight.set(key, task);
+}
+
+function schedulePanelRefresh(artistName: string): void {
+  const key = normalizeCacheArtistKey(artistName);
+  if (panelRefreshInFlight.has(key)) return;
+
+  const task = (async () => {
+    const fresh = await fetchPanelDataClient(artistName);
+    if (fresh.artist || fresh.tracks.length) {
+      await writeSharedSearchCache('panel', artistName, fresh);
+    }
+  })()
+    .catch(() => {
+      // best effort
+    })
+    .finally(() => {
+      panelRefreshInFlight.delete(key);
+    });
+
+  panelRefreshInFlight.set(key, task);
+}
+
+async function getGraphDataWithSharedCache(artistName: string): Promise<GraphData> {
+  const cached = await readSharedSearchCache<GraphData>('graph', artistName);
+  if (isGraphData(cached.data) && cached.data.nodes.length) {
+    if (cached.stale) {
+      scheduleGraphRefresh(artistName);
+    }
+    return cached.data;
+  }
+
+  const fresh = await buildGraphData(artistName, 2);
+  if (fresh.nodes.length) {
+    void writeSharedSearchCache('graph', artistName, fresh);
+  }
+  return fresh;
+}
+
+async function getPanelDataWithSharedCache(artistName: string): Promise<PanelData> {
+  const cached = await readSharedSearchCache<PanelData>('panel', artistName);
+  if (isPanelData(cached.data)) {
+    if (cached.stale) {
+      schedulePanelRefresh(artistName);
+    }
+    return cached.data;
+  }
+
+  const fresh = await fetchPanelDataClient(artistName);
+  if (fresh.artist || fresh.tracks.length) {
+    void writeSharedSearchCache('panel', artistName, fresh);
+  }
+  return fresh;
+}
+
 export default function MusicMapApp({
   seedArtist,
   initialGraphData,
@@ -277,7 +420,7 @@ export default function MusicMapApp({
       if (restoredFromCacheRef.current) return;
       try {
         setIsClientGraphLoading(true);
-        const data = await buildGraphData(seedArtist, 2);
+        const data = await getGraphDataWithSharedCache(seedArtist);
         setGraph(data);
         if (firstLoadRef.current) firstLoadRef.current = false;
       } catch {
@@ -404,7 +547,7 @@ export default function MusicMapApp({
       setIsExpanding(true);
       const token = ++expandTokenRef.current;
       try {
-        const incoming = await buildGraphData(artistName, 2);
+        const incoming = await getGraphDataWithSharedCache(artistName);
         if (expandTokenRef.current !== token) return;
         setGraph((prev) => mergeGraphs(prev, incoming, { anchorName: artistName }));
         setCenterNodeName(artistName);
@@ -444,7 +587,7 @@ export default function MusicMapApp({
         setPanelOpen(true);
         setActivePanelArtist(node.name);
         setClientPanelData(null);
-        fetchPanelDataClient(node.name)
+        getPanelDataWithSharedCache(node.name)
           .then((data) => {
             setClientPanelData(data);
             // If we obtained an image from Spotify that the node lacks, update it

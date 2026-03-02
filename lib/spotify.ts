@@ -250,6 +250,8 @@ type TopTracksArchivePayload = {
 };
 
 let topTracksArchivePromise: Promise<TopTracksArchivePayload | null> | null = null;
+const TOP_TRACKS_ARCHIVE_KV_KEY =
+  process.env.TOP_TRACKS_ARCHIVE_KV_KEY || 'archive:top-tracks:v1';
 
 function normalizeArtistKey(name: string): string {
   return name.trim().toLowerCase().replace(/\s+/g, ' ');
@@ -260,12 +262,26 @@ async function loadTopTracksArchive(): Promise<TopTracksArchivePayload | null> {
   if (!isServer()) return null;
 
   if (!topTracksArchivePromise) {
-    topTracksArchivePromise = import('@/data/top-tracks-archive.json')
-      .then((mod) => mod.default as TopTracksArchivePayload)
-      .catch(() => null);
+    topTracksArchivePromise = (async () => {
+      try {
+        const { getMusicCacheKV } = await import('@/lib/server/cache');
+        const kv = await getMusicCacheKV();
+        if (!kv) return null;
+        const raw = await kv.get(TOP_TRACKS_ARCHIVE_KV_KEY);
+        if (!raw) return null;
+        return JSON.parse(raw) as TopTracksArchivePayload;
+      } catch {
+        return null;
+      }
+    })();
   }
 
-  return await topTracksArchivePromise;
+  const archive = await topTracksArchivePromise;
+  if (!archive) {
+    // Allow retry on later requests if KV was temporarily empty/unavailable.
+    topTracksArchivePromise = null;
+  }
+  return archive;
 }
 
 async function getArchiveTopTracks(artistName: string): Promise<SpotifyTrack[]> {

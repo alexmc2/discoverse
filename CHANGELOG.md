@@ -2,6 +2,36 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2026-03-02]
+
+### Added
+- Added `app/api/search-cache/route.ts` to provide shared KV-backed cache reads/writes for graph and panel payloads by artist name.
+- Added stale-while-revalidate cache metadata and response fields (`stale`, `cachedAt`) for global search-cache entries.
+- Added configurable soft/hard TTL environment variables for shared search cache:
+  - `SEARCH_CACHE_GRAPH_TTL_SECONDS`
+  - `SEARCH_CACHE_PANEL_TTL_SECONDS`
+  - `SEARCH_CACHE_GRAPH_HARD_TTL_SECONDS`
+  - `SEARCH_CACHE_PANEL_HARD_TTL_SECONDS`
+- Added `scripts/upload-archives-to-kv.mjs` to upload large archive JSON files into `MUSIC_CACHE` for both production and preview namespaces.
+- Added npm scripts:
+  - `npm run kv:upload-archives`
+  - `npm run kv:upload-archives:dry`
+- Added `.github/copilot-instructions.md` with project-specific Copilot review guidance.
+
+### Changed
+- Replaced bundle-time JSON archive imports with KV runtime reads:
+  - `lib/spotify.ts` now reads top-tracks archive from KV key `archive:top-tracks:v1`.
+  - `lib/server/artists.ts` now reads artist bootstrap archive from KV key `archive:artist-cache:v1`.
+- Updated `lib/server/cache.ts` KV binding resolution to use Cloudflare context (`Symbol.for('__cloudflare-context__')`) with legacy global fallback.
+- Updated `next.config.mjs` to initialize OpenNext Cloudflare context in local dev via `initOpenNextCloudflareForDev()`.
+- Updated `components/music-map-app.tsx` to use shared cache-first lookups for graph and panel data, with background refresh on stale hits.
+- Updated archive loaders in `lib/spotify.ts` and `lib/server/artists.ts` to retry on future requests when a previous KV read returned null.
+
+### Fixed
+- Fixed Cloudflare deploy-time worker size failure (`10027`) by moving large archive payloads out of the worker bundle.
+- Reduced dry-run upload bundle size to ~`gzip: 1992 KiB` (under free-plan 3 MiB script limit).
+- Fixed local/remote KV upload ambiguity for bindings that include both `id` and `preview_id` by using explicit `--preview true|false`.
+
 ## [2026-02-21]
 
 ### Added
