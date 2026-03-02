@@ -333,6 +333,37 @@ function dedupeTracksById(tracks: SpotifyTrack[]): SpotifyTrack[] {
   return Array.from(map.values());
 }
 
+/** Normalise a track name for duplicate detection (strip noise like remaster tags, key signatures, etc.) */
+function normalizeTrackName(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/\s*[-–—]\s*(remaster|remastered|live|bonus|deluxe|remix|mono|stereo|version|edit|single|album|mix|original|recording|take \d+).*$/i, '')
+    .replace(/\s*\((?:remaster|remastered|live|bonus|deluxe|remix|mono|stereo|version|edit|single|album|mix|original|recording|feat\.?|ft\.?|take \d+)[^)]*\)/gi, '')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+}
+
+/** Remove tracks with duplicate names, keeping the best version (preview > popularity). */
+function dedupeTracksByName(tracks: SpotifyTrack[]): SpotifyTrack[] {
+  const map = new Map<string, SpotifyTrack>();
+  for (const track of tracks) {
+    const key = normalizeTrackName(track.name);
+    if (!key) continue;
+    const prev = map.get(key);
+    if (!prev) {
+      map.set(key, track);
+      continue;
+    }
+    // Prefer the version with a preview, then higher popularity
+    const prevScore = (prev.preview_url ? 10 : 0) + (prev.popularity ?? 0);
+    const curScore = (track.preview_url ? 10 : 0) + (track.popularity ?? 0);
+    if (curScore > prevScore) {
+      map.set(key, track);
+    }
+  }
+  return Array.from(map.values());
+}
+
 /** ====== Public: search + images + url ====== */
 
 export async function searchSpotifyArtist(
@@ -374,12 +405,15 @@ export async function searchSpotifyTracks(
     }
   }
 
-  const deduped = dedupeTracksById(collected);
-  deduped.sort((a, b) => {
+  const dedupedById = dedupeTracksById(collected);
+  dedupedById.sort((a, b) => {
     const s = scoreTrackMatch(b, normalizedArtist) - scoreTrackMatch(a, normalizedArtist);
     if (s !== 0) return s;
     return (b.popularity ?? 0) - (a.popularity ?? 0);
   });
+
+  // Remove same-name duplicates (e.g. multiple recordings of classical pieces)
+  const deduped = dedupeTracksByName(dedupedById);
 
   return deduped.slice(0, 10);
 }
