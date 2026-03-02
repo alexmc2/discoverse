@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 ## [2026-03-02]
 
 ### Added
-- Added `lib/server/search-cache.ts` server action for authenticated cache writes, replacing the unauthenticated POST endpoint.
+- Added `lib/server/search-cache.ts` server action for cache writes, replacing the previous public POST endpoint.
 - Added `app/api/search-cache/route.ts` to provide shared KV-backed cache reads for graph and panel payloads by artist name.
 - Added stale-while-revalidate cache metadata and response fields (`stale`, `cachedAt`) for global search-cache entries.
 - Added configurable soft/hard TTL environment variables for shared search cache:

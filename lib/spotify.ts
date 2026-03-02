@@ -191,13 +191,16 @@ function sleep(ms: number): Promise<void> {
 async function spotifyGET<T>(url: string, token: string): Promise<T | null> {
   if (inCooloff()) return null;
 
+  let lastWas429 = false;
   for (let attempt = 0; attempt < 3; attempt++) {
+    lastWas429 = false;
     try {
       const res = await withLimit(() =>
         fetch(url, { headers: { Authorization: `Bearer ${token}` } })
       );
 
       if (res.status === 429) {
+        lastWas429 = true;
         const retryAfter = Number.parseInt(
           res.headers.get('retry-after') ?? '',
           10
@@ -219,7 +222,8 @@ async function spotifyGET<T>(url: string, token: string): Promise<T | null> {
     }
   }
 
-  noteFailure();
+  // Trip breaker if we exhausted retries on 429s (catch path already called noteFailure)
+  if (lastWas429) noteFailure();
   return null;
 }
 
