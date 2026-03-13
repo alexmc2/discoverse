@@ -21,10 +21,6 @@ interface SpotifySearchResponse {
   artists: { items: SpotifyArtist[] };
 }
 
-interface SpotifyTrackSearchResponse {
-  tracks?: { items?: SpotifyTrack[] };
-}
-
 export interface SpotifyTrackAlbumImage {
   url: string;
   height: number;
@@ -48,6 +44,10 @@ export interface SpotifyTrack {
   popularity: number;
   album: SpotifyTrackAlbum;
   artists: SpotifyTrackArtist[];
+}
+
+interface SpotifyTopTracksResponse {
+  tracks: SpotifyTrack[];
 }
 
 interface SpotifyToken {
@@ -184,47 +184,22 @@ function noteFailure() {
   }
 }
 
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
 async function spotifyGET<T>(url: string, token: string): Promise<T | null> {
   if (inCooloff()) return null;
 
-  let lastWas429 = false;
-  for (let attempt = 0; attempt < 3; attempt++) {
-    lastWas429 = false;
-    try {
-      const res = await withLimit(() =>
-        fetch(url, { headers: { Authorization: `Bearer ${token}` } })
-      );
+  try {
+    const res = await withLimit(() =>
+      fetch(url, { headers: { Authorization: `Bearer ${token}` } })
+    );
+    if (!res.ok) return null;
 
-      if (res.status === 429) {
-        lastWas429 = true;
-        const retryAfter = Number.parseInt(
-          res.headers.get('retry-after') ?? '',
-          10
-        );
-        const waitMs = Number.isFinite(retryAfter) && retryAfter > 0
-          ? retryAfter * 1000
-          : (attempt + 1) * 700;
-        await sleep(waitMs);
-        continue;
-      }
-
-      if (!res.ok) return null;
-
-      consecutiveFailures = 0; // success resets breaker
-      return (await res.json()) as T;
-    } catch {
-      // Miniflare often throws "Network connection lost" here
-      noteFailure();
-    }
+    consecutiveFailures = 0; // success resets breaker
+    return (await res.json()) as T;
+  } catch {
+    // Miniflare often throws "Network connection lost" here
+    noteFailure();
+    return null;
   }
-
-  // Trip breaker if we exhausted retries on 429s (catch path already called noteFailure)
-  if (lastWas429) noteFailure();
-  return null;
 }
 
 /** ====== Market detection ====== */
@@ -243,96 +218,6 @@ function detectMarketPriority(): string[] {
   return defaults;
 }
 
-type TopTracksArchivePayload = {
-  generatedAt?: string;
-  artists?: Record<
-    string,
-    {
-      artistName?: string;
-      tracks?: SpotifyTrack[];
-    }
-  >;
-};
-
-let topTracksArchivePromise: Promise<TopTracksArchivePayload | null> | null = null;
-const TOP_TRACKS_ARCHIVE_KV_KEY =
-  process.env.TOP_TRACKS_ARCHIVE_KV_KEY || 'archive:top-tracks:v1';
-
-function normalizeArtistKey(name: string): string {
-  return name.trim().toLowerCase().replace(/\s+/g, ' ');
-}
-
-async function loadTopTracksArchive(): Promise<TopTracksArchivePayload | null> {
-  // Keep archive loading server-side to avoid shipping this data to clients.
-  if (!isServer()) return null;
-
-  if (!topTracksArchivePromise) {
-    topTracksArchivePromise = (async () => {
-      try {
-        const { getMusicCacheKV } = await import('@/lib/server/cache');
-        const kv = await getMusicCacheKV();
-        if (!kv) return null;
-        const raw = await kv.get(TOP_TRACKS_ARCHIVE_KV_KEY);
-        if (!raw) return null;
-        return JSON.parse(raw) as TopTracksArchivePayload;
-      } catch {
-        return null;
-      }
-    })();
-  }
-
-  const archive = await topTracksArchivePromise;
-  if (!archive) {
-    // Allow retry on later requests if KV was temporarily empty/unavailable.
-    topTracksArchivePromise = null;
-  }
-  return archive;
-}
-
-async function getArchiveTopTracks(artistName: string): Promise<SpotifyTrack[]> {
-  const archive = await loadTopTracksArchive();
-  const normalized = normalizeArtistKey(artistName);
-  const tracks = archive?.artists?.[normalized]?.tracks;
-  if (!tracks?.length) return [];
-  return tracks.slice(0, 10);
-}
-
-function normalizeMatchText(value: string): string {
-  return value.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
-}
-
-function scoreTrackMatch(track: SpotifyTrack, normalizedArtist: string): number {
-  const names = track.artists.map((a) => normalizeMatchText(a.name));
-  const hasExact = names.some((name) => name === normalizedArtist);
-  const hasContains = names.some(
-    (name) => name.includes(normalizedArtist) || normalizedArtist.includes(name)
-  );
-  const hasPreview = !!track.preview_url;
-  return (hasExact ? 1000 : 0) + (hasContains ? 100 : 0) + (hasPreview ? 10 : 0);
-}
-
-function dedupeTracksById(tracks: SpotifyTrack[]): SpotifyTrack[] {
-  const map = new Map<string, SpotifyTrack>();
-  for (const track of tracks) {
-    if (!track?.id) continue;
-    const prev = map.get(track.id);
-    if (!prev) {
-      map.set(track.id, track);
-      continue;
-    }
-
-    if (!prev.preview_url && track.preview_url) {
-      map.set(track.id, track);
-      continue;
-    }
-
-    if ((track.popularity ?? 0) > (prev.popularity ?? 0)) {
-      map.set(track.id, track);
-    }
-  }
-  return Array.from(map.values());
-}
-
 /** ====== Public: search + images + url ====== */
 
 export async function searchSpotifyArtist(
@@ -347,41 +232,6 @@ export async function searchSpotifyArtist(
 
   const data = await spotifyGET<SpotifySearchResponse>(url, token);
   return data?.artists.items?.[0] ?? null;
-}
-
-export async function searchSpotifyTracks(
-  artistName: string,
-  marketHint?: string
-): Promise<SpotifyTrack[]> {
-  const token = await getSpotifyToken();
-  if (!token) return [];
-
-  const normalizedArtist = normalizeMatchText(artistName);
-  const market = marketHint || detectMarketPriority()[0] || 'US';
-  const limit = 10; // API limit max is now 10
-
-  const queries = [`artist:${artistName}`, artistName];
-  const collected: SpotifyTrack[] = [];
-
-  for (const query of queries) {
-    const url = `https://api.spotify.com/v1/search?q=${encodeURIComponent(
-      query
-    )}&type=track&limit=${limit}&market=${market}`;
-    const data = await spotifyGET<SpotifyTrackSearchResponse>(url, token);
-    const items = data?.tracks?.items ?? [];
-    if (items.length) {
-      collected.push(...items);
-    }
-  }
-
-  const deduped = dedupeTracksById(collected);
-  deduped.sort((a, b) => {
-    const s = scoreTrackMatch(b, normalizedArtist) - scoreTrackMatch(a, normalizedArtist);
-    if (s !== 0) return s;
-    return (b.popularity ?? 0) - (a.popularity ?? 0);
-  });
-
-  return deduped.slice(0, 10);
 }
 
 export async function getArtistImage(
@@ -499,16 +349,46 @@ export async function getArtistTopTracks(
   artistName: string,
   marketHint?: string
 ): Promise<SpotifyTrack[]> {
-  // First, use local archive tracks when present.
-  const archiveTracks = await getArchiveTopTracks(artistName);
-  if (archiveTracks.length) return archiveTracks.slice(0, 10);
-
-  // In local preview with Miniflare, avoid server-side Spotify calls entirely
-  // when explicitly forced, but still allow archive lookup above.
   if (isServer() && FORCE_CLIENT) return [];
+  const token = await getSpotifyToken();
+  if (!token) return [];
 
-  const tracks = await searchSpotifyTracks(artistName, marketHint);
+  const artist = await searchSpotifyArtist(artistName);
+  if (!artist) return [];
+
+  const marketOrder = marketHint
+    ? [marketHint, ...detectMarketPriority().filter((m) => m !== marketHint)]
+    : detectMarketPriority();
+
+  let tracks: SpotifyTrack[] = [];
+  for (const market of marketOrder) {
+    const url = `https://api.spotify.com/v1/artists/${artist.id}/top-tracks?market=${market}`;
+    const data = await spotifyGET<SpotifyTopTracksResponse>(url, token);
+    if (data?.tracks?.length) {
+      tracks = data.tracks.slice(0, 10);
+      break;
+    }
+  }
   if (!tracks.length) return [];
+
+  // Try alternate markets for previews if needed
+  const hasAnyPreview = tracks.some((t) => !!t.preview_url);
+  if (!hasAnyPreview) {
+    for (const market of marketOrder) {
+      const url = `https://api.spotify.com/v1/artists/${artist.id}/top-tracks?market=${market}`;
+      const data = await spotifyGET<SpotifyTopTracksResponse>(url, token);
+      if (!data?.tracks?.length) continue;
+      for (const t of tracks) {
+        if (!t.preview_url) {
+          const alt = data.tracks.find(
+            (x) => x.name.toLowerCase() === t.name.toLowerCase()
+          );
+          if (alt?.preview_url) t.preview_url = alt.preview_url;
+        }
+      }
+      if (tracks.some((t) => !!t.preview_url)) break;
+    }
+  }
 
   if (tracks.some((t) => !t.preview_url)) {
     await enrichWithITunesPreviews(artistName, tracks);

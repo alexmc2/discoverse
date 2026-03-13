@@ -34,7 +34,7 @@ Discoverse is an interactive music discovery platform that visualises artist con
 - **Loading States**: Elegant loading animations with Lottie
 - **Accessibility First**: Full keyboard navigation and screen reader support
 
-### ⚡ Performance Optimised
+### ⚡ Performance Optimized
 
 - **Server-Side Rendering**: Next.js 15 App Router with React Server Components
 - **Smart Caching**: Intelligent data caching with revalidation strategies

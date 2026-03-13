@@ -11,32 +11,11 @@ type KVLike = {
   ) => Promise<void>;
 };
 
-type CloudflareContextLike = {
-  env?: {
-    MUSIC_CACHE?: KVLike;
-  };
-};
-
-const cloudflareContextSymbol = Symbol.for('__cloudflare-context__');
-
-function getKVFromContext(): KVLike | null {
-  const g = globalThis as Record<string | symbol, unknown>;
-  const context = g[cloudflareContextSymbol] as CloudflareContextLike | undefined;
-  return context?.env?.MUSIC_CACHE ?? null;
-}
-
 // Detect a bound KV namespace (configure binding name in wrangler.jsonc)
-async function getKV(): Promise<KVLike | null> {
-  // Legacy fallback if a binding is attached directly to global scope.
+function getKV(): KVLike | null {
+  // Use a typed view of globalThis to avoid `any` and keep lint happy.
   const g = globalThis as unknown as { MUSIC_CACHE?: KVLike };
-  if (g.MUSIC_CACHE) return g.MUSIC_CACHE;
-
-  // OpenNext/Cloudflare stores bindings under the Cloudflare context symbol.
-  return getKVFromContext();
-}
-
-export async function getMusicCacheKV(): Promise<KVLike | null> {
-  return getKV();
+  return g.MUSIC_CACHE ?? null;
 }
 
 // Simple in-memory fallback (per-isolate, non-persistent)
@@ -47,7 +26,7 @@ export async function cacheJSON<T>(
   ttlSeconds: number,
   fetcher: () => Promise<T>
 ): Promise<T> {
-  const kv = await getKV();
+  const kv = getKV();
   const now = Date.now();
 
   if (kv) {
@@ -85,7 +64,7 @@ export function cacheKey(parts: Array<string | number | undefined | null>): stri
 
 // Optional helpers when you want to check first, then decide whether to set
 export async function getCached<T>(key: string): Promise<T | null> {
-  const kv = await getKV();
+  const kv = getKV();
   const now = Date.now();
   if (kv) {
     try {
@@ -107,7 +86,7 @@ export async function setCached<T>(
   value: T,
   ttlSeconds: number
 ): Promise<void> {
-  const kv = await getKV();
+  const kv = getKV();
   const now = Date.now();
   const payload = JSON.stringify(value);
   if (kv) {

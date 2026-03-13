@@ -1,6 +1,5 @@
 {
 	"name": "discoverse",
-	"account_id": "d511519ce20c87359d6a73a38793e586",
 	"main": ".open-next/worker.js",
 	"compatibility_date": "2025-03-25",
 	"compatibility_flags": [
