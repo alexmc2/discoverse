@@ -1,6 +1,6 @@
 // app/page.tsx
 import MusicMapApp from '@/components/music-map-app';
-import { getDefaultArtistBootstrap } from '@/lib/server/artists';
+import { getDefaultArtistBootstrap, getSearchCacheBootstrap } from '@/lib/server/artists';
 import { getRandomArtists } from '@/lib/server/random-artists';
 
 interface PageProps {
@@ -30,13 +30,14 @@ export default async function Home({ searchParams }: PageProps) {
   }
 
   // Fast path: for default suggested artists, hydrate from precomputed cache.
-  // Non-default searches still load on the client to avoid SSR subrequest limits.
+  // Fallback: check search cache (populated by prior user searches via KV).
   const defaultBootstrap = await getDefaultArtistBootstrap(seedArtist);
+  const bootstrap = defaultBootstrap ?? await getSearchCacheBootstrap(seedArtist);
   return (
     <MusicMapApp
       seedArtist={seedArtist}
-      initialGraphData={defaultBootstrap?.graphData ?? null}
-      panelData={defaultBootstrap?.panelData ?? null}
+      initialGraphData={bootstrap?.graphData ?? null}
+      panelData={bootstrap?.panelData ?? null}
       randomArtists={randomArtists}
     />
   );

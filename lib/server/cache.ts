@@ -12,7 +12,7 @@ type KVLike = {
 };
 
 // Detect a bound KV namespace (configure binding name in wrangler.jsonc)
-function getKV(): KVLike | null {
+export function getKV(): KVLike | null {
   // Use a typed view of globalThis to avoid `any` and keep lint happy.
   const g = globalThis as unknown as { MUSIC_CACHE?: KVLike };
   return g.MUSIC_CACHE ?? null;

@@ -280,6 +280,12 @@ export default function MusicMapApp({
         setIsClientGraphLoading(true);
         const data = await buildGraphData(seedArtist, 2);
         setGraph(data);
+        // Save to shared KV cache (fire-and-forget)
+        fetch('/api/search-cache', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ artist: seedArtist, type: 'graph', data }),
+        }).catch(() => {});
         if (firstLoadRef.current) firstLoadRef.current = false;
       } catch {
         // keep default view on failure
@@ -451,6 +457,12 @@ export default function MusicMapApp({
           .then((data) => {
             setClientPanelData(data);
             setTracksLoading(false);
+            // Save to shared KV cache (fire-and-forget)
+            fetch('/api/search-cache', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ artist: node.name, type: 'panel', data }),
+            }).catch(() => {});
             // If we obtained an image from Spotify that the node lacks, update it
             const img = data?.artist?.image;
             if (img) {

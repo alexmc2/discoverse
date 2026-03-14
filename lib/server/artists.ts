@@ -14,6 +14,7 @@ import {
   getArtistSpotifyUrl, // <-- now exported
 } from '@/lib/spotify';
 import { POPULAR_ARTISTS_POOL } from '@/lib/popular-artists';
+import { getKV } from '@/lib/server/cache';
 // No caching here: keep randomization per request. Heavy lookups are cached elsewhere.
 
 export interface ArtistDetails {
@@ -65,15 +66,30 @@ const DEFAULT_ARTIST_SET = new Set(
 
 let cachedArtistIndexPromise: Promise<CachedArtistIndex | null> | null = null;
 
+const ARTIST_CACHE_KV_KEY = 'artist-cache:v1';
+const SEARCH_CACHE_GRAPH_KEY = 'search-cache:v1:graph:';
+const SEARCH_CACHE_PANEL_KEY = 'search-cache:v1:panel:';
+
 function normalizeArtistName(artistName: string): string {
   return artistName.trim().toLowerCase();
 }
 
 async function loadCachedArtistIndex(): Promise<CachedArtistIndex | null> {
   if (!cachedArtistIndexPromise) {
-    cachedArtistIndexPromise = import('@/data/artist-cache.json')
-      .then((mod) => mod.default as CachedArtistIndex)
-      .catch(() => null);
+    cachedArtistIndexPromise = (async () => {
+      // Try KV first (production)
+      const kv = getKV();
+      if (kv) {
+        try {
+          const raw = await kv.get(ARTIST_CACHE_KV_KEY);
+          if (raw) return JSON.parse(raw) as CachedArtistIndex;
+        } catch { /* fall through */ }
+      }
+      // Fallback: static JSON (local dev)
+      return import('@/data/artist-cache.json')
+        .then((mod) => mod.default as CachedArtistIndex)
+        .catch(() => null);
+    })();
   }
   return cachedArtistIndexPromise;
 }
@@ -144,4 +160,36 @@ export async function getDefaultArtistBootstrap(artistName: string): Promise<{
     graphData: cached.graphData,
     panelData: cached.panelData ?? null,
   };
+}
+
+export async function getSearchCacheBootstrap(artistName: string): Promise<{
+  graphData: GraphData;
+  panelData: {
+    artist: ArtistDetails | null;
+    tracks: TrackData[];
+    trackSource: TrackSource;
+  } | null;
+} | null> {
+  const kv = getKV();
+  if (!kv) return null;
+  const normalized = normalizeArtistName(artistName);
+
+  try {
+    const graphRaw = await kv.get(SEARCH_CACHE_GRAPH_KEY + normalized);
+    if (!graphRaw) return null;
+    const graphEnvelope = JSON.parse(graphRaw);
+    const graphData = graphEnvelope?.data ?? graphEnvelope;
+    if (!graphData?.nodes) return null;
+
+    let panelData = null;
+    const panelRaw = await kv.get(SEARCH_CACHE_PANEL_KEY + normalized);
+    if (panelRaw) {
+      const panelEnvelope = JSON.parse(panelRaw);
+      panelData = panelEnvelope?.data ?? panelEnvelope;
+    }
+
+    return { graphData, panelData };
+  } catch {
+    return null;
+  }
 }
