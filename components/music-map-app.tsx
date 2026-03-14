@@ -389,6 +389,9 @@ export default function MusicMapApp({
       // or the random artist buttons. Only node clicks/panel actions extend.
       const trimmed = artistName?.trim();
       if (!trimmed) return;
+      const nextHref = `/?q=${encodeURIComponent(trimmed)}`;
+      const isSameArtistSearch =
+        seedArtist?.trim().toLowerCase() === trimmed.toLowerCase();
 
       setPanelOpen(false);
       setActivePanelArtist(null);
@@ -397,14 +400,17 @@ export default function MusicMapApp({
       firstLoadRef.current = true;
       setCenterNodeName(null);
       setUrlFocus(null);
-      clearAllQueryParams();
       setResetSignal((s) => s + 1);
 
       startTransition(() => {
-        router.replace(`/?q=${encodeURIComponent(trimmed)}`);
+        if (isSameArtistSearch) {
+          router.refresh();
+          return;
+        }
+        router.replace(nextHref);
       });
     },
-    [router, setUrlFocus, clearAllQueryParams]
+    [router, seedArtist, setUrlFocus]
   );
 
   const expandFrom = useCallback(
@@ -531,6 +537,7 @@ export default function MusicMapApp({
             fill
             priority
             unoptimized
+            sizes="100vw"
             className="object-cover object-[85%_25%] sm:object-top opacity-[0.15]"
             style={{
               maskImage:

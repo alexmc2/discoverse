@@ -11,11 +11,33 @@ type KVLike = {
   ) => Promise<void>;
 };
 
+const cloudflareContextSymbol = Symbol.for('__cloudflare-context__');
+
+function isKVLike(value: unknown): value is KVLike {
+  return !!value && typeof value === 'object' &&
+    'get' in value && typeof value.get === 'function' &&
+    'put' in value && typeof value.put === 'function';
+}
+
 // Detect a bound KV namespace (configure binding name in wrangler.jsonc)
 export function getKV(): KVLike | null {
-  // Use a typed view of globalThis to avoid `any` and keep lint happy.
-  const g = globalThis as unknown as { MUSIC_CACHE?: KVLike };
-  return g.MUSIC_CACHE ?? null;
+  type CloudflareContextLike = {
+    env?: {
+      MUSIC_CACHE?: unknown;
+    };
+  };
+
+  const g = globalThis as typeof globalThis & {
+    MUSIC_CACHE?: unknown;
+    [cloudflareContextSymbol]?: CloudflareContextLike;
+  };
+
+  if (isKVLike(g.MUSIC_CACHE)) {
+    return g.MUSIC_CACHE;
+  }
+
+  const contextKV = g[cloudflareContextSymbol]?.env?.MUSIC_CACHE;
+  return isKVLike(contextKV) ? contextKV : null;
 }
 
 // Simple in-memory fallback (per-isolate, non-persistent)

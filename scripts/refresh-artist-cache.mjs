@@ -219,7 +219,6 @@ async function main() {
   const next = { ...existing };
   const startedAt = Date.now();
   let refreshedCount = 0;
-  let skippedCount = 0;
   let fallbackCount = 0;
   let failedCount = 0;
   const failedArtists = [];

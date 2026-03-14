@@ -67,3 +67,6 @@ data/rolling-stone-500-artists-2024.md
 
 data/artist-cache copy.json
 
+data/artist-cache-IN-PROGRESS.json
+
+lib/popular-artists-v0.ts

@@ -29,6 +29,10 @@ export async function POST(request: Request) {
   const key = `search-cache:v1:${type}:${normalized}`;
   const envelope = { v: 1, cachedAt: Date.now(), data };
 
-  await kv.put(key, JSON.stringify(envelope), { expirationTtl: HARD_TTL_SECONDS });
+  try {
+    await kv.put(key, JSON.stringify(envelope), { expirationTtl: HARD_TTL_SECONDS });
+  } catch {
+    return Response.json({ ok: false }, { status: 500 });
+  }
   return Response.json({ ok: true });
 }

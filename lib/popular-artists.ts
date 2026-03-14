@@ -340,7 +340,7 @@ export const POPULAR_ARTISTS_POOL = [
   'Selena',
   'Run-DMC',
   'Lynyrd Skynyrd',
-  'Yusuf / Cat Stevens',
+  'Cat Stevens',
   'Foo Fighters',
   'Allman Brothers Band',
   'Wilco',
