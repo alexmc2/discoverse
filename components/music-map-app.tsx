@@ -54,6 +54,11 @@ interface GraphData {
   links: GraphLink[];
 }
 
+function normalizeArtistName(value: string | null | undefined): string | null {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed.toLowerCase() : null;
+}
+
 const MusicGraph = dynamic(() => import('@/components/music-graph'), {
   ssr: false,
   loading: () => <LoadingScreen message="Initializing graph engine..." />,
@@ -315,17 +320,25 @@ export default function MusicMapApp({
 
   const hasSearchedFromUrl = !!seedArtist;
   const hasData = graph.nodes.length > 0;
+  const resolvedSeedArtist =
+    panelData?.artist?.name?.trim() ||
+    initialGraphData?.nodes.find((node) => node.depth === 0)?.name?.trim() ||
+    initialGraphData?.nodes
+      .find((node) => normalizeArtistName(node.name) === normalizeArtistName(seedArtist))
+      ?.name?.trim() ||
+    seedArtist?.trim() ||
+    null;
 
   const [centerNodeName, setCenterNodeName] = useState<string | null>(
-    seedArtist ?? null 
+    resolvedSeedArtist
   );
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const params = new URLSearchParams(window.location.search);
     const focus = params.get('focus');
-    setCenterNodeName(focus || seedArtist || null);
-  }, [seedArtist]);
+    setCenterNodeName(focus || resolvedSeedArtist || null);
+  }, [resolvedSeedArtist]);
 
   // Panel state
   const [panelOpen, setPanelOpen] = useState(false);
@@ -341,7 +354,7 @@ export default function MusicMapApp({
     if (
       panelOpen &&
       activePanelArtist &&
-      activePanelArtist === seedArtist &&
+      normalizeArtistName(activePanelArtist) === normalizeArtistName(resolvedSeedArtist) &&
       panelData
     ) {
       const hasSpotifyTracksWithoutPreviews =
@@ -361,7 +374,7 @@ export default function MusicMapApp({
         setClientPanelData(panelData);
       }
     }
-  }, [panelOpen, activePanelArtist, seedArtist, panelData]);
+  }, [panelOpen, activePanelArtist, resolvedSeedArtist, panelData]);
 
   const [isExpanding, setIsExpanding] = useState(false);
   const expandTokenRef = useRef(0);
@@ -390,27 +403,38 @@ export default function MusicMapApp({
       const trimmed = artistName?.trim();
       if (!trimmed) return;
       const nextHref = `/?q=${encodeURIComponent(trimmed)}`;
-      const isSameArtistSearch =
-        seedArtist?.trim().toLowerCase() === trimmed.toLowerCase();
+      const normalizedCurrent = normalizeArtistName(seedArtist);
+      const normalizedNext = normalizeArtistName(trimmed);
+      const isSameArtistSearch = normalizedCurrent === normalizedNext;
+      const isExactSearch = seedArtist?.trim() === trimmed;
 
       setPanelOpen(false);
       setActivePanelArtist(null);
       setClientPanelData(null);
-      setGraph({ nodes: [], links: [] });
       firstLoadRef.current = true;
-      setCenterNodeName(null);
       setUrlFocus(null);
       setResetSignal((s) => s + 1);
 
+      if (isSameArtistSearch) {
+        setCenterNodeName(resolvedSeedArtist ?? trimmed);
+        startTransition(() => {
+          if (isExactSearch) {
+            router.refresh();
+            return;
+          }
+          router.replace(nextHref);
+        });
+        return;
+      }
+
+      setGraph({ nodes: [], links: [] });
+      setCenterNodeName(null);
+
       startTransition(() => {
-        if (isSameArtistSearch) {
-          router.refresh();
-          return;
-        }
         router.replace(nextHref);
       });
     },
-    [router, seedArtist, setUrlFocus]
+    [resolvedSeedArtist, router, seedArtist, setUrlFocus]
   );
 
   const expandFrom = useCallback(
@@ -449,7 +473,9 @@ export default function MusicMapApp({
     (node: GraphNode) => {
       if (mode === 'map') {
         // Clicking the current center should just recenter, not expand.
-        if (centerNodeName && node.name === centerNodeName) {
+        if (
+          normalizeArtistName(centerNodeName) === normalizeArtistName(node.name)
+        ) {
           setRecenterSignal((s) => s + 1);
           return;
         }
