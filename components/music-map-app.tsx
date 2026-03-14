@@ -328,6 +328,7 @@ export default function MusicMapApp({
   const [clientPanelData, setClientPanelData] = useState<PanelData | null>(
     null
   );
+  const [tracksLoading, setTracksLoading] = useState(false);
 
   useEffect(() => {
     if (
@@ -444,9 +445,11 @@ export default function MusicMapApp({
         setPanelOpen(true);
         setActivePanelArtist(node.name);
         setClientPanelData(null);
+        setTracksLoading(true);
         fetchPanelDataClient(node.name)
           .then((data) => {
             setClientPanelData(data);
+            setTracksLoading(false);
             // If we obtained an image from Spotify that the node lacks, update it
             const img = data?.artist?.image;
             if (img) {
@@ -463,9 +466,10 @@ export default function MusicMapApp({
               });
             }
           })
-          .catch(() =>
-            setClientPanelData({ artist: null, tracks: [], trackSource: null })
-          );
+          .catch(() => {
+            setClientPanelData({ artist: null, tracks: [], trackSource: null });
+            setTracksLoading(false);
+          });
       }
     },
     [mode, expandFrom, centerNodeName]
@@ -554,6 +558,7 @@ export default function MusicMapApp({
           artist={clientPanelData?.artist ?? null}
           tracks={clientPanelData?.tracks ?? []}
           trackSource={clientPanelData?.trackSource ?? null}
+          tracksLoading={tracksLoading}
           onClose={handleClosePanel}
           onExpand={handleExpandFromPanel}
         />
