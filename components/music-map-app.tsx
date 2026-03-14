@@ -3,6 +3,7 @@
 
 import { useCallback, useEffect, useRef, useState, useTransition } from 'react';
 import dynamic from 'next/dynamic';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import LoadingScreen from '@/components/loading-screen';
 import Header from '@/components/ui/header';
@@ -502,12 +503,14 @@ export default function MusicMapApp({
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-sky-900/20 via-blue-900/20 to-indigo-900/20" />
 
       {showDefault && (
-        <div className="absolute inset-0 overflow-hidden pointer-events-none hidden sm:block">
-          <img
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <Image
             src="/dp-image.jpg"
             alt=""
-            aria-hidden="true"
-            className="absolute inset-0 w-full h-full object-cover object-top opacity-[0.15]"
+            aria-hidden
+            fill
+            priority
+            className="object-cover object-[85%_25%] sm:object-top opacity-[0.15]"
             style={{
               maskImage:
                 'radial-gradient(ellipse 80% 75% at 50% 40%, black 30%, transparent 100%)',
