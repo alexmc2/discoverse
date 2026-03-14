@@ -62,3 +62,8 @@ add_file_paths.sh
 archive*
 
 development-notes/*
+
+data/rolling-stone-500-artists-2024.md
+
+data/artist-cache copy.json
+

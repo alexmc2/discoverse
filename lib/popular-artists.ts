@@ -109,7 +109,6 @@ export const POPULAR_ARTISTS_POOL = [
   'Stevie Wonder',
   'The Kinks',
   'Beyoncé',
-  'Prince and the Revolution',
   'John Lennon',
   'Robyn',
   'Billie Holiday',
