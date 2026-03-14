@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { getRandomArtists } from '@/lib/server/random-artists';
 
 export async function GET() {
-  const randomArtists = getRandomArtists(5);
+  const randomArtists = getRandomArtists(4);
   return NextResponse.json(
     { artists: randomArtists },
     {
