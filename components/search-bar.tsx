@@ -29,9 +29,15 @@ export default function SearchBar({
   const navigatingRef = useRef(false);
 
   useEffect(() => {
+    const dismissSuggestions = () => {
+      requestSeqRef.current += 1;
+      setSelectedIndex(-1);
+      setShowSuggestions(false);
+    };
+
     const handleClickOutside = (e: MouseEvent) => {
       if (searchRef.current && !searchRef.current.contains(e.target as Node)) {
-        setShowSuggestions(false);
+        dismissSuggestions();
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -130,6 +136,7 @@ export default function SearchBar({
         }
         break;
       case 'Escape':
+        requestSeqRef.current += 1;
         setShowSuggestions(false);
         setSelectedIndex(-1);
         inputRef.current?.blur();
