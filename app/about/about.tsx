@@ -63,6 +63,19 @@ export function AboutContent() {
           aria-label="Soundwaves animation"
         />
       </div>
+
+      <p className="text-xs text-slate-500 mt-4">
+        Landing page image: &quot;Daft Punk in 2013&quot; by Sony Music
+        Entertainment, additional editing by W.carter,{' '}
+        <a
+          href="https://commons.wikimedia.org/w/index.php?curid=144852275"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-slate-400 hover:text-sky-400 underline underline-offset-2"
+        >
+          CC BY 4.0
+        </a>
+      </p>
     </div>
   );
 }

@@ -501,6 +501,23 @@ export default function MusicMapApp({
     <div className="min-h-screen bg-gradient-to-br from-sky-950/10 via-blue-900/10 to-indigo-950/10 relative overflow-hidden">
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-sky-900/20 via-blue-900/20 to-indigo-900/20" />
 
+      {showDefault && (
+        <div className="absolute inset-0 overflow-hidden pointer-events-none hidden sm:block">
+          <img
+            src="/dp-image.jpg"
+            alt=""
+            aria-hidden="true"
+            className="absolute inset-0 w-full h-full object-cover object-top opacity-[0.15]"
+            style={{
+              maskImage:
+                'radial-gradient(ellipse 80% 75% at 50% 40%, black 30%, transparent 100%)',
+              WebkitMaskImage:
+                'radial-gradient(ellipse 80% 75% at 50% 40%, black 30%, transparent 100%)',
+            }}
+          />
+        </div>
+      )}
+
       <Header
         onSearch={startNewSearch}
         isLoading={isPending || showAnyOverlay}
