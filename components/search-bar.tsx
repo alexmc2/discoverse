@@ -60,7 +60,6 @@ export default function SearchBar({
     }
     if (debounceRef.current) clearTimeout(debounceRef.current);
 
-    navigatingRef.current = false;
     const requestId = ++requestSeqRef.current;
     const currentQuery = query;
 
@@ -146,7 +145,10 @@ export default function SearchBar({
             ref={inputRef}
             type="text"
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => {
+              navigatingRef.current = false;
+              setQuery(e.target.value);
+            }}
             onKeyDown={handleKeyDown}
             onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
             placeholder="Search for an artist..."
@@ -160,6 +162,7 @@ export default function SearchBar({
             <button
               type="button"
               onClick={() => {
+                navigatingRef.current = false;
                 setQuery('');
                 setSuggestions([]);
                 setSelectedIndex(-1);
