@@ -65,11 +65,18 @@ export default function SearchBar({
     const currentQuery = query;
 
     debounceRef.current = setTimeout(async () => {
-      const results = await searchArtist(currentQuery);
-      if (requestSeqRef.current !== requestId || navigatingRef.current) return;
-      setSuggestions(results);
-      setSelectedIndex(-1);
-      setShowSuggestions(results.length > 0);
+      try {
+        const results = await searchArtist(currentQuery);
+        if (requestSeqRef.current !== requestId || navigatingRef.current) return;
+        setSuggestions(results);
+        setSelectedIndex(-1);
+        setShowSuggestions(results.length > 0);
+      } catch {
+        if (requestSeqRef.current !== requestId || navigatingRef.current) return;
+        setSuggestions([]);
+        setSelectedIndex(-1);
+        setShowSuggestions(false);
+      }
     }, 300);
 
     return () => {

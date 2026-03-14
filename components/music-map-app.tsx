@@ -416,6 +416,7 @@ export default function MusicMapApp({
       setResetSignal((s) => s + 1);
 
       if (isSameArtistSearch) {
+        setCenterNodeName(resolvedSeedArtist ?? trimmed);
         startTransition(() => {
           if (isExactSearch) {
             router.refresh();
@@ -433,7 +434,7 @@ export default function MusicMapApp({
         router.replace(nextHref);
       });
     },
-    [router, seedArtist, setUrlFocus]
+    [resolvedSeedArtist, router, seedArtist, setUrlFocus]
   );
 
   const expandFrom = useCallback(
