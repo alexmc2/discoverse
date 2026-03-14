@@ -295,26 +295,37 @@ async function fetchITunesPreview(
   track: string
 ): Promise<string | null> {
   try {
-    const url = `https://itunes.apple.com/search?term=${encodeURIComponent(
-      `${artist} ${track}`
-    )}&media=music&entity=song&limit=5`;
-    const res = await withLimit(() => fetch(url));
-    if (!res.ok) return null;
-    const data: ITunesSearchResponse = await res.json();
+    if (isServer()) {
+      // Server-side: call iTunes directly (no CORS issue)
+      const url = `https://itunes.apple.com/search?term=${encodeURIComponent(
+        `${artist} ${track}`
+      )}&media=music&entity=song&limit=5`;
+      const res = await withLimit(() => fetch(url));
+      if (!res.ok) return null;
+      const data: ITunesSearchResponse = await res.json();
 
-    if (!data.results || data.resultCount === 0) return null;
+      if (!data.results || data.resultCount === 0) return null;
 
-    const lowerArtist = artist.toLowerCase();
-    const lowerTrack = track.toLowerCase();
+      const lowerArtist = artist.toLowerCase();
+      const lowerTrack = track.toLowerCase();
 
-    const exact = data.results.find((r) => {
-      const a = (r.artistName || '').toLowerCase();
-      const t = (r.trackName || '').toLowerCase();
-      return a.includes(lowerArtist) && t === lowerTrack && !!r.previewUrl;
-    });
+      const exact = data.results.find((r) => {
+        const a = (r.artistName || '').toLowerCase();
+        const t = (r.trackName || '').toLowerCase();
+        return a.includes(lowerArtist) && t === lowerTrack && !!r.previewUrl;
+      });
 
-    const candidate = exact ?? data.results.find((r) => !!r.previewUrl) ?? null;
-    return candidate?.previewUrl ?? null;
+      const candidate =
+        exact ?? data.results.find((r) => !!r.previewUrl) ?? null;
+      return candidate?.previewUrl ?? null;
+    } else {
+      // Client-side: use proxy to avoid CORS 403
+      const url = `/api/itunes-preview?artist=${encodeURIComponent(artist)}&track=${encodeURIComponent(track)}`;
+      const res = await withLimit(() => fetch(url));
+      if (!res.ok) return null;
+      const data = await res.json();
+      return data.previewUrl ?? null;
+    }
   } catch {
     return null;
   }

@@ -119,31 +119,39 @@ async function lastfmGet<T>(
   params: Record<string, string | number> = {},
   ttlSeconds = 6 * 60 * 60 // default 6h cache
 ): Promise<T> {
-  const url = new URL(LASTFM_BASE);
-  url.searchParams.set('method', method);
-  url.searchParams.set('format', 'json');
-
-  // Provide API key on both server and client when available
-  if (isServer()) {
-    if (!LASTFM_API_KEY) throw new Error('Missing NEXT_PUBLIC_LASTFM_API_KEY');
-    url.searchParams.set('api_key', LASTFM_API_KEY);
-  } else if (LASTFM_API_KEY) {
-    url.searchParams.set('api_key', LASTFM_API_KEY);
-  }
-
-  for (const [k, v] of Object.entries(params)) {
-    url.searchParams.set(k, String(v));
-  }
-
-  const finalUrl = url.toString();
-
   // KV-backed cache by normalized (method + params)
   const key = cacheKey(['lf', method, ...Object.entries(params).flat()]);
-  return cacheJSON<T>(key, ttlSeconds, async () => {
-    const res = await fetch(finalUrl, { cache: 'no-store' });
-    if (!res.ok) throw new Error(`Last.fm error ${res.status} for ${method}`);
-    return (await res.json()) as T;
-  });
+
+  if (isServer()) {
+    // Server-side: call Last.fm directly (no CORS issue)
+    const url = new URL(LASTFM_BASE);
+    url.searchParams.set('method', method);
+    url.searchParams.set('format', 'json');
+    if (!LASTFM_API_KEY) throw new Error('Missing NEXT_PUBLIC_LASTFM_API_KEY');
+    url.searchParams.set('api_key', LASTFM_API_KEY);
+    for (const [k, v] of Object.entries(params)) {
+      url.searchParams.set(k, String(v));
+    }
+    const finalUrl = url.toString();
+    return cacheJSON<T>(key, ttlSeconds, async () => {
+      const res = await fetch(finalUrl, { cache: 'no-store' });
+      if (!res.ok) throw new Error(`Last.fm error ${res.status} for ${method}`);
+      return (await res.json()) as T;
+    });
+  } else {
+    // Client-side: use /api/lastfm proxy to avoid CORS blocks
+    const proxyUrl = new URL('/api/lastfm', window.location.origin);
+    proxyUrl.searchParams.set('method', method);
+    for (const [k, v] of Object.entries(params)) {
+      proxyUrl.searchParams.set(k, String(v));
+    }
+    const finalUrl = proxyUrl.toString();
+    return cacheJSON<T>(key, ttlSeconds, async () => {
+      const res = await fetch(finalUrl, { cache: 'no-store' });
+      if (!res.ok) throw new Error(`Last.fm error ${res.status} for ${method}`);
+      return (await res.json()) as T;
+    });
+  }
 }
 
 const LASTFM_METHOD_TTLS: Record<string, number> = {

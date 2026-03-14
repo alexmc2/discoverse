@@ -522,6 +522,7 @@ export default function MusicMapApp({
             aria-hidden
             fill
             priority
+            unoptimized
             className="object-cover object-[85%_25%] sm:object-top opacity-[0.15]"
             style={{
               maskImage:

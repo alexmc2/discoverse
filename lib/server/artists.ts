@@ -61,7 +61,7 @@ interface CachedArtistEntry {
 type CachedArtistIndex = Record<string, CachedArtistEntry>;
 
 const DEFAULT_ARTIST_SET = new Set(
-  POPULAR_ARTISTS_POOL.map((artist) => artist.trim().toLowerCase())
+  POPULAR_ARTISTS_POOL.map((artist) => artist.trim().toLowerCase()),
 );
 
 let cachedArtistIndexPromise: Promise<CachedArtistIndex | null> | null = null;
@@ -83,7 +83,9 @@ async function loadCachedArtistIndex(): Promise<CachedArtistIndex | null> {
         try {
           const raw = await kv.get(ARTIST_CACHE_KV_KEY);
           if (raw) return JSON.parse(raw) as CachedArtistIndex;
-        } catch { /* fall through */ }
+        } catch {
+          /* fall through */
+        }
       }
       // Fallback: static JSON (local dev)
       return import('@/data/artist-cache.json')
