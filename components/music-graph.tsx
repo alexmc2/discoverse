@@ -107,6 +107,10 @@ export default function MusicGraph({
   }, []);
 
   const didInitialFitRef = useRef(false);
+  // Track whether we need to do the initial center-on-artist in onEngineStop
+  // (where node positions are stable) rather than in the centering effect
+  // (which fires too early while the simulation is still running).
+  const needsInitialCenterRef = useRef(true);
 
   useEffect(() => {
     if (graphRef.current && data.nodes.length > 0) {
@@ -137,6 +141,10 @@ export default function MusicGraph({
   // recentre on current artist when center changes or user presses the button
   useEffect(() => {
     if (!centerNodeName || !graphRef.current) return;
+
+    // On first load, skip early centering — onEngineStop will handle it
+    // once node positions have stabilised.
+    if (needsInitialCenterRef.current) return;
 
     const fg = graphRef.current;
     let attempts = 0;
@@ -535,6 +543,28 @@ export default function MusicGraph({
         maxZoom={7}
         cooldownTicks={100}
         onEngineStop={() => {
+          if (needsInitialCenterRef.current) {
+            needsInitialCenterRef.current = false;
+            didInitialFitRef.current = true;
+            if (centerNodeName) {
+              const node = data.nodes.find(
+                (n) => n.name === centerNodeName
+              ) as ForceGraphNode | undefined;
+              if (node && node.x != null && node.y != null) {
+                graphRef.current?.centerAt(
+                  node.x as number,
+                  node.y as number,
+                  900
+                );
+                graphRef.current?.zoom(2, 900);
+              } else {
+                graphRef.current?.zoomToFit(400, 50);
+              }
+            } else {
+              graphRef.current?.zoomToFit(400, 50);
+            }
+            return;
+          }
           // Avoid overriding user focus after expansions; only fit once
           if (!didInitialFitRef.current && !centerNodeName) {
             graphRef.current?.zoomToFit(400, 50);
