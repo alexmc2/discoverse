@@ -33,9 +33,14 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   let popularSearches: string[] = [];
   try {
-    popularSearches = await getTopChartArtistNames(POPULAR_SEARCH_SITEMAP_LIMIT);
+    popularSearches = await getTopChartArtistNames(
+      POPULAR_SEARCH_SITEMAP_LIMIT,
+    );
   } catch {
-    popularSearches = POPULAR_ARTISTS_POOL.slice(0, POPULAR_SEARCH_SITEMAP_LIMIT);
+    popularSearches = POPULAR_ARTISTS_POOL.slice(
+      0,
+      POPULAR_SEARCH_SITEMAP_LIMIT,
+    );
   }
 
   const popularSearchRoutes: MetadataRoute.Sitemap = Array.from(

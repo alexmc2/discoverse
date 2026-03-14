@@ -3,6 +3,7 @@
 
 import { useCallback, useEffect, useRef, useState, useTransition } from 'react';
 import dynamic from 'next/dynamic';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import LoadingScreen from '@/components/loading-screen';
 import Header from '@/components/ui/header';
@@ -279,6 +280,12 @@ export default function MusicMapApp({
         setIsClientGraphLoading(true);
         const data = await buildGraphData(seedArtist, 2);
         setGraph(data);
+        // Save to shared KV cache (fire-and-forget)
+        fetch('/api/search-cache', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ artist: seedArtist, type: 'graph', data }),
+        }).catch(() => {});
         if (firstLoadRef.current) firstLoadRef.current = false;
       } catch {
         // keep default view on failure
@@ -382,6 +389,9 @@ export default function MusicMapApp({
       // or the random artist buttons. Only node clicks/panel actions extend.
       const trimmed = artistName?.trim();
       if (!trimmed) return;
+      const nextHref = `/?q=${encodeURIComponent(trimmed)}`;
+      const isSameArtistSearch =
+        seedArtist?.trim().toLowerCase() === trimmed.toLowerCase();
 
       setPanelOpen(false);
       setActivePanelArtist(null);
@@ -390,14 +400,17 @@ export default function MusicMapApp({
       firstLoadRef.current = true;
       setCenterNodeName(null);
       setUrlFocus(null);
-      clearAllQueryParams();
       setResetSignal((s) => s + 1);
 
       startTransition(() => {
-        router.replace(`/?q=${encodeURIComponent(trimmed)}`);
+        if (isSameArtistSearch) {
+          router.refresh();
+          return;
+        }
+        router.replace(nextHref);
       });
     },
-    [router, setUrlFocus, clearAllQueryParams]
+    [router, seedArtist, setUrlFocus]
   );
 
   const expandFrom = useCallback(
@@ -450,6 +463,20 @@ export default function MusicMapApp({
           .then((data) => {
             setClientPanelData(data);
             setTracksLoading(false);
+            // Save to shared KV cache (fire-and-forget) — skip if Spotify
+            // tracks all lack previews (iTunes was likely down; let the next
+            // user retry instead of caching broken data for 180 days).
+            const allPreviewsNull =
+              data.trackSource === 'spotify' &&
+              data.tracks.length > 0 &&
+              data.tracks.every((t) => t.preview_url === null);
+            if (!allPreviewsNull) {
+              fetch('/api/search-cache', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ artist: node.name, type: 'panel', data }),
+              }).catch(() => {});
+            }
             // If we obtained an image from Spotify that the node lacks, update it
             const img = data?.artist?.image;
             if (img) {
@@ -500,6 +527,27 @@ export default function MusicMapApp({
   return (
     <div className="min-h-screen bg-gradient-to-br from-sky-950/10 via-blue-900/10 to-indigo-950/10 relative overflow-hidden">
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-sky-900/20 via-blue-900/20 to-indigo-900/20" />
+
+      {showDefault && (
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <Image
+            src="/dp-image.jpg"
+            alt=""
+            aria-hidden
+            fill
+            priority
+            unoptimized
+            sizes="100vw"
+            className="object-cover object-[85%_25%] sm:object-top opacity-[0.15]"
+            style={{
+              maskImage:
+                'radial-gradient(ellipse 80% 75% at 50% 40%, black 30%, transparent 100%)',
+              WebkitMaskImage:
+                'radial-gradient(ellipse 80% 75% at 50% 40%, black 30%, transparent 100%)',
+            }}
+          />
+        </div>
+      )}
 
       <Header
         onSearch={startNewSearch}

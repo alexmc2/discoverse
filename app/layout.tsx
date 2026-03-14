@@ -21,11 +21,13 @@ export const metadata: Metadata = {
   keywords:
     'music discovery app, music similar artists, artist map, interactive music map, last.fm, spotify, music visualisation, music graph, artist network',
   authors: [{ name: 'Discoverse' }],
+  manifest: '/manifest.json',
   icons: {
     icon: [
       { url: '/favicon.png', type: 'image/png', sizes: '64x64' },
       { url: '/icon.svg', type: 'image/svg+xml' },
     ],
+    apple: [{ url: '/icon-192.png', sizes: '192x192', type: 'image/png' }],
   },
   openGraph: {
     title: 'Discoverse | Interactive Music Discovery Map',

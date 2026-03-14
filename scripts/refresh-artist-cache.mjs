@@ -28,6 +28,7 @@ function parseArgs(argv) {
   const args = {
     artists: [],
     dryRun: false,
+    skipExisting: false,
     help: false,
   };
 
@@ -55,6 +56,11 @@ function parseArgs(argv) {
       continue;
     }
 
+    if (token === '--skip-existing') {
+      args.skipExisting = true;
+      continue;
+    }
+
     if (token === '--help' || token === '-h') {
       args.help = true;
       continue;
@@ -75,6 +81,7 @@ function printHelp() {
       '  npm run refresh:artist-cache',
       '  npm run refresh:artist-cache -- --artist \"Depeche Mode\"',
       '  npm run refresh:artist-cache -- --artist=\"Radiohead\" --dry-run',
+      '  npm run refresh:artist-cache -- --skip-existing',
       '',
       'Env required:',
       '  NEXT_PUBLIC_LASTFM_API_KEY',
@@ -213,14 +220,38 @@ async function main() {
   const startedAt = Date.now();
   let refreshedCount = 0;
   let fallbackCount = 0;
+  let failedCount = 0;
+  const failedArtists = [];
   const nowIso = new Date().toISOString();
 
-  console.log(`Refreshing ${artists.length} artist cache entries...`);
+  const toFetch = args.skipExisting
+    ? artists.filter((a) => !existing[normalizeArtistName(a)]?.graphData)
+    : artists;
 
-  for (let i = 0; i < artists.length; i++) {
-    const displayName = artists[i];
+  if (args.skipExisting) {
+    console.log(
+      `${artists.length} total artists, ${artists.length - toFetch.length} already cached, ${toFetch.length} to fetch...`
+    );
+    // Carry forward all existing entries
+    for (const a of artists) {
+      const key = normalizeArtistName(a);
+      if (existing[key]) next[key] = existing[key];
+    }
+  } else {
+    console.log(`Refreshing ${artists.length} artist cache entries...`);
+  }
+
+  const CHECKPOINT_EVERY = 10; // save to disk every N artists
+
+  for (let i = 0; i < toFetch.length; i++) {
+    const displayName = toFetch[i];
     const cacheKey = normalizeArtistName(displayName);
-    process.stdout.write(`[${i + 1}/${artists.length}] ${displayName} ... `);
+    const elapsed = ((Date.now() - startedAt) / 1000).toFixed(0);
+    const avgPer = refreshedCount > 0 ? (Date.now() - startedAt) / refreshedCount / 1000 : 0;
+    const remaining = avgPer > 0 ? Math.round(avgPer * (toFetch.length - i)) : '?';
+    process.stdout.write(
+      `[${i + 1}/${toFetch.length}] ${displayName} (${elapsed}s elapsed, ~${remaining}s left) ... `
+    );
 
     try {
       next[cacheKey] = await refreshEntry(displayName, nowIso);
@@ -232,9 +263,16 @@ async function main() {
         fallbackCount++;
         console.log('fallback to existing');
       } else {
-        console.log('failed');
-        throw error;
+        failedCount++;
+        failedArtists.push(displayName);
+        console.log(`skipped (${error?.message || error})`);
       }
+    }
+
+    // Checkpoint: save progress to disk periodically
+    if (!args.dryRun && (i + 1) % CHECKPOINT_EVERY === 0) {
+      await writeFile(CACHE_PATH, `${JSON.stringify(next, null, 2)}\n`, 'utf8');
+      console.log(`  -> checkpoint saved (${Object.keys(next).length} artists in cache)`);
     }
   }
 
@@ -247,8 +285,12 @@ async function main() {
 
   const elapsedSec = ((Date.now() - startedAt) / 1000).toFixed(1);
   console.log(
-    `Done in ${elapsedSec}s (refreshed=${refreshedCount}, fallback=${fallbackCount}).`
+    `Done in ${elapsedSec}s (refreshed=${refreshedCount}, skipped=${artists.length - toFetch.length}, fallback=${fallbackCount}, failed=${failedCount}).`
   );
+  if (failedArtists.length > 0) {
+    console.log(`\nFailed artists (rerun with --skip-existing to retry):`);
+    for (const name of failedArtists) console.log(`  - ${name}`);
+  }
 }
 
 main().catch((error) => {

@@ -8,4 +8,3 @@ export function getRandomArtists(count = 4): string[] {
   }
   return shuffled.slice(0, count);
 }
-
