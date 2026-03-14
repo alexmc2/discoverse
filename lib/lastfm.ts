@@ -110,6 +110,10 @@ function normalizeTag(tag?: string) {
   return (tag || 'unknown').toLowerCase();
 }
 
+function isPlaceholderImage(url?: string | null): boolean {
+  return !url || url.includes('2a96cbd8b46e442fc41c2b86b821562f');
+}
+
 /** ===== Core GET helper ===== */
 
 import { cacheJSON, cacheKey } from './server/cache';
@@ -316,6 +320,9 @@ export async function getTopChartArtistNames(limit = 50): Promise<string[]> {
 
 declare global {
   var __lf_imageMemo: Map<string, Promise<string | undefined>> | undefined;
+  var __lf_infoMemo:
+    | Map<string, Promise<Awaited<ReturnType<typeof getArtistInfo>> | null>>
+    | undefined;
   var __lf_listenersMemo: Map<string, Promise<number | null>> | undefined;
 }
 
@@ -325,6 +332,15 @@ const imageMemo: Map<
 > = globalThis.__lf_imageMemo ?? new Map<string, Promise<string | undefined>>();
 if (!globalThis.__lf_imageMemo) {
   globalThis.__lf_imageMemo = imageMemo;
+}
+
+const infoMemo: Map<
+  string,
+  Promise<Awaited<ReturnType<typeof getArtistInfo>> | null>
+> = globalThis.__lf_infoMemo ??
+  new Map<string, Promise<Awaited<ReturnType<typeof getArtistInfo>> | null>>();
+if (!globalThis.__lf_infoMemo) {
+  globalThis.__lf_infoMemo = infoMemo;
 }
 
 const listenersMemo: Map<
@@ -340,12 +356,29 @@ function getImageMemoized(name: string): Promise<string | undefined> {
   if (!imageMemo.has(key)) {
     imageMemo.set(
       key,
-      (async (): Promise<string | undefined> => {
+      (async () => {
         try {
-          return await getArtistImage(name);
+          const spotifyImage = await getArtistImage(name);
+          if (spotifyImage) return spotifyImage;
         } catch {
-          return undefined;
+          // fall through to Last.fm info
         }
+
+        if (!infoMemo.has(key)) {
+          infoMemo.set(
+            key,
+            (async () => {
+              try {
+                return await getArtistInfo(name);
+              } catch {
+                return null;
+              }
+            })()
+          );
+        }
+
+        const info = await infoMemo.get(key)!;
+        return isPlaceholderImage(info?.image) ? undefined : info?.image;
       })()
     );
   }
@@ -355,16 +388,21 @@ function getImageMemoized(name: string): Promise<string | undefined> {
 async function getListenersMemoized(name: string): Promise<number | null> {
   const key = name.toLowerCase();
   if (!listenersMemo.has(key)) {
+    if (!infoMemo.has(key)) {
+      infoMemo.set(
+        key,
+        (async () => {
+          try {
+            return await getArtistInfo(name);
+          } catch {
+            return null;
+          }
+        })()
+      );
+    }
     listenersMemo.set(
       key,
-      (async (): Promise<number | null> => {
-        try {
-          const info = await getArtistInfo(name);
-          return info?.listeners ?? null;
-        } catch {
-          return null;
-        }
-      })()
+      infoMemo.get(key)!.then((info) => info?.listeners ?? null)
     );
   }
   return listenersMemo.get(key)!;
@@ -377,7 +415,7 @@ export async function buildGraphData(seedArtist: string, depth = 2) {
   const links: GraphLink[] = [];
   const processed = new Set<string>();
 
-  const [seedTags, seedInfo, seedSpotifyImage] = await Promise.all([
+  const [seedTags, seedInfo, seedLastFmImage] = await Promise.all([
     getArtistTags(seedArtist),
     getArtistInfo(seedArtist),
     getImageMemoized(seedArtist),
@@ -388,7 +426,9 @@ export async function buildGraphData(seedArtist: string, depth = 2) {
     name: seedArtist,
     group: normalizeTag(seedTags[0]),
     size: 20,
-    image: seedSpotifyImage || seedInfo?.image,
+    image:
+      seedLastFmImage ||
+      (isPlaceholderImage(seedInfo?.image) ? undefined : seedInfo?.image),
     tags: seedTags,
     depth: 0,
   };
@@ -422,7 +462,9 @@ export async function buildGraphData(seedArtist: string, depth = 2) {
         name: artist.name,
         group: normalizeTag(tags[0]),
         size: 10,
-        image: d1ImageMap.get(artist.name) || artist.image,
+        image:
+          d1ImageMap.get(artist.name) ||
+          (isPlaceholderImage(artist.image) ? undefined : artist.image),
         tags,
         depth: 1,
       });
@@ -477,7 +519,9 @@ export async function buildGraphData(seedArtist: string, depth = 2) {
             name: related.name,
             group: normalizeTag(tags[0]),
             size: 6,
-            image: d2ImageMap.get(related.name) || related.image,
+            image:
+              d2ImageMap.get(related.name) ||
+              (isPlaceholderImage(related.image) ? undefined : related.image),
             tags,
             depth: 2,
           });
