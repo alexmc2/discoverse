@@ -284,16 +284,29 @@ interface ITunesResult {
   artistName: string;
   trackName: string;
   previewUrl?: string;
+  collectionName?: string;
+  artworkUrl100?: string;
 }
 interface ITunesSearchResponse {
   resultCount: number;
   results: ITunesResult[];
 }
 
-async function fetchITunesPreview(
+interface ITunesTrackMatch {
+  albumName?: string;
+  artworkUrl?: string;
+  previewUrl: string | null;
+}
+
+function upscaleITunesArtwork(url?: string): string | undefined {
+  if (!url) return undefined;
+  return url.replace(/\/\d+x\d+bb\./, '/600x600bb.');
+}
+
+async function fetchITunesTrackMatch(
   artist: string,
   track: string
-): Promise<string | null> {
+): Promise<ITunesTrackMatch | null> {
   try {
     const url = `https://itunes.apple.com/search?term=${encodeURIComponent(
       `${artist} ${track}`
@@ -310,38 +323,95 @@ async function fetchITunesPreview(
     const exact = data.results.find((r) => {
       const a = (r.artistName || '').toLowerCase();
       const t = (r.trackName || '').toLowerCase();
-      return a.includes(lowerArtist) && t === lowerTrack && !!r.previewUrl;
+      return (
+        a.includes(lowerArtist) &&
+        t === lowerTrack &&
+        (!!r.previewUrl || !!r.collectionName || !!r.artworkUrl100)
+      );
     });
 
-    const candidate = exact ?? data.results.find((r) => !!r.previewUrl) ?? null;
-    return candidate?.previewUrl ?? null;
+    const candidate =
+      exact ??
+      data.results.find(
+        (r) => !!r.previewUrl || !!r.collectionName || !!r.artworkUrl100
+      ) ??
+      null;
+    if (!candidate) return null;
+
+    return {
+      albumName: candidate.collectionName,
+      artworkUrl: upscaleITunesArtwork(candidate.artworkUrl100),
+      previewUrl: candidate.previewUrl ?? null,
+    };
   } catch {
     return null;
   }
+}
+
+type PreviewableTrack = {
+  name: string;
+  preview_url: string | null;
+  artists: Array<{ name: string }>;
+  album?: {
+    name: string;
+    images: Array<{ url: string }>;
+  };
+};
+
+export async function enrichTracksWithITunesPreviews<
+  T extends PreviewableTrack,
+>(artistName: string, tracks: T[]): Promise<T[]> {
+  const nextTracks = tracks.map((track) => ({ ...track }));
+  if (!nextTracks.length) return nextTracks;
+
+  const concurrency = 3;
+  let index = 0;
+
+  async function worker(): Promise<void> {
+    while (index < nextTracks.length) {
+      const current = index++;
+      const t = nextTracks[current];
+
+      const candidate = await fetchITunesTrackMatch(
+        t.artists[0]?.name ?? artistName,
+        t.name
+      );
+      if (!candidate) continue;
+
+      if (candidate.previewUrl && !t.preview_url) {
+        t.preview_url = candidate.previewUrl;
+      }
+
+      if (t.album) {
+        const hasAlbumName = !!t.album.name && t.album.name !== '—';
+        const hasAlbumImages = Array.isArray(t.album.images) && t.album.images.length > 0;
+        t.album = {
+          ...t.album,
+          name:
+            hasAlbumName || !candidate.albumName
+              ? t.album.name
+              : candidate.albumName,
+          images:
+            hasAlbumImages || !candidate.artworkUrl
+              ? t.album.images
+              : [{ url: candidate.artworkUrl }],
+        };
+      }
+    }
+  }
+
+  await Promise.all(Array.from({ length: concurrency }).map(() => worker()));
+  return nextTracks;
 }
 
 async function enrichWithITunesPreviews(
   artistName: string,
   tracks: SpotifyTrack[]
 ): Promise<void> {
-  const concurrency = 3;
-  let index = 0;
-
-  async function worker(): Promise<void> {
-    while (index < tracks.length) {
-      const current = index++;
-      const t = tracks[current];
-      if (t.preview_url) continue;
-
-      const candidate = await fetchITunesPreview(
-        t.artists[0]?.name ?? artistName,
-        t.name
-      );
-      if (candidate) t.preview_url = candidate;
-    }
+  const enriched = await enrichTracksWithITunesPreviews(artistName, tracks);
+  for (const [index, track] of enriched.entries()) {
+    tracks[index].preview_url = track.preview_url;
   }
-
-  await Promise.all(Array.from({ length: concurrency }).map(() => worker()));
 }
 
 /** ====== Public: top tracks with robust previews ====== */

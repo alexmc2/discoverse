@@ -11,6 +11,7 @@ import {
 import {
   getArtistImage,
   getArtistTopTracks,
+  enrichTracksWithITunesPreviews,
   getArtistSpotifyUrl, // <-- now exported
 } from '@/lib/spotify';
 import { POPULAR_ARTISTS_POOL } from '@/lib/popular-artists';
@@ -89,10 +90,6 @@ export async function fetchArtistData(artistName: string) {
     getArtistSpotifyUrl(artistName),
   ]);
 
-  const artist: ArtistDetails | null = info
-    ? { ...info, image: spotifyImage || info.image, spotifyUrl }
-    : null;
-
   let tracks: TrackData[] = [];
   let trackSource: TrackSource = null;
 
@@ -103,20 +100,36 @@ export async function fetchArtistData(artistName: string) {
       trackSource = 'spotify';
     } else {
       const lastFmTracks = await getLastFmTopTracks(artistName, 10);
-      tracks = lastFmTracks.map((t, idx) => ({
-        id: `${artistName}-${t.name}-${idx}`,
-        name: t.name,
-        preview_url: null,
-        duration_ms: 0,
-        popularity: 0,
-        album: { name: '—', images: [] },
-        artists: [{ name: t.artist }],
-      }));
+      tracks = await enrichTracksWithITunesPreviews(
+        artistName,
+        lastFmTracks.map((t, idx) => ({
+          id: `${artistName}-${t.name}-${idx}`,
+          name: t.name,
+          preview_url: null,
+          duration_ms: 0,
+          popularity: 0,
+          album: { name: '—', images: [] },
+          artists: [{ name: t.artist }],
+        }))
+      );
       trackSource = 'lastfm';
     }
   } catch {
     // silent fallback
   }
+
+  const fallbackTrackImage = tracks.find(
+    (track) => track.album?.images?.[0]?.url
+  )?.album.images[0]?.url;
+  const resolvedArtistImage =
+    spotifyImage && !spotifyImage.includes('2a96cbd8b46e442fc41c2b86b821562f')
+      ? spotifyImage
+      : info?.image && !info.image.includes('2a96cbd8b46e442fc41c2b86b821562f')
+      ? info.image
+      : fallbackTrackImage;
+  const artist: ArtistDetails | null = info
+    ? { ...info, image: resolvedArtistImage, spotifyUrl }
+    : null;
 
   return { artist, tracks, trackSource };
 }

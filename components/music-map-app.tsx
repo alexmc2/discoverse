@@ -21,6 +21,7 @@ import {
   getArtistImage,
   getArtistTopTracks,
   getArtistSpotifyUrl,
+  enrichTracksWithITunesPreviews,
 } from '@/lib/spotify';
 
 type TrackSource = 'spotify' | 'lastfm' | null;
@@ -154,9 +155,6 @@ async function fetchPanelDataClient(artistName: string): Promise<PanelData> {
     getArtistImage(artistName),
     getArtistSpotifyUrl(artistName),
   ]);
-  const artist = info
-    ? { ...info, image: spotifyImg || info.image, spotifyUrl }
-    : null;
 
   let tracks: PanelData['tracks'] = [];
   let trackSource: TrackSource = null;
@@ -168,22 +166,70 @@ async function fetchPanelDataClient(artistName: string): Promise<PanelData> {
       trackSource = 'spotify';
     } else {
       const lastFmTracks = await getLastFmTopTracks(artistName, 10);
-      tracks = lastFmTracks.map((t, idx) => ({
-        id: `${artistName}-${t.name}-${idx}`,
-        name: t.name,
-        preview_url: null,
-        duration_ms: 0,
-        popularity: 0,
-        album: { name: '—', images: [] },
-        artists: [{ name: t.artist }],
-      }));
+      tracks = await enrichTracksWithITunesPreviews(
+        artistName,
+        lastFmTracks.map((t, idx) => ({
+          id: `${artistName}-${t.name}-${idx}`,
+          name: t.name,
+          preview_url: null,
+          duration_ms: 0,
+          popularity: 0,
+          album: { name: '—', images: [] },
+          artists: [{ name: t.artist }],
+        }))
+      );
       trackSource = 'lastfm';
     }
   } catch {
     /* noop */
   }
 
+  const fallbackTrackImage = tracks.find(
+    (track) => track.album?.images?.[0]?.url
+  )?.album.images[0]?.url;
+  const resolvedArtistImage =
+    spotifyImg && !spotifyImg.includes('2a96cbd8b46e442fc41c2b86b821562f')
+      ? spotifyImg
+      : info?.image && !info.image.includes('2a96cbd8b46e442fc41c2b86b821562f')
+      ? info.image
+      : fallbackTrackImage;
+  const artist = info
+    ? { ...info, image: resolvedArtistImage, spotifyUrl }
+    : null;
+
   return { artist, tracks, trackSource };
+}
+
+function getPlayableTrackCount(tracks: PanelData['tracks']): number {
+  return tracks.reduce(
+    (count, track) => count + (track.preview_url ? 1 : 0),
+    0
+  );
+}
+
+function shouldReplacePanelData(
+  current: PanelData | null,
+  incoming: PanelData
+): boolean {
+  if (!current) return true;
+
+  const currentPlayable = getPlayableTrackCount(current.tracks);
+  const incomingPlayable = getPlayableTrackCount(incoming.tracks);
+  if (incomingPlayable !== currentPlayable) {
+    return incomingPlayable > currentPlayable;
+  }
+
+  const currentIsSpotify = current.trackSource === 'spotify';
+  const incomingIsSpotify = incoming.trackSource === 'spotify';
+  if (incomingIsSpotify !== currentIsSpotify) {
+    return incomingIsSpotify;
+  }
+
+  if (incoming.tracks.length !== current.tracks.length) {
+    return incoming.tracks.length > current.tracks.length;
+  }
+
+  return true;
 }
 
 export default function MusicMapApp({
@@ -328,6 +374,8 @@ export default function MusicMapApp({
   const [clientPanelData, setClientPanelData] = useState<PanelData | null>(
     null
   );
+  const [isPanelTracksLoading, setIsPanelTracksLoading] = useState(false);
+  const panelRequestTokenRef = useRef(0);
 
   useEffect(() => {
     if (
@@ -385,6 +433,8 @@ export default function MusicMapApp({
       setPanelOpen(false);
       setActivePanelArtist(null);
       setClientPanelData(null);
+      setIsPanelTracksLoading(false);
+      panelRequestTokenRef.current++;
       setGraph({ nodes: [], links: [] });
       firstLoadRef.current = true;
       setCenterNodeName(null);
@@ -424,6 +474,8 @@ export default function MusicMapApp({
     setPanelOpen(false);
     setActivePanelArtist(null);
     setClientPanelData(null);
+    setIsPanelTracksLoading(false);
+    panelRequestTokenRef.current++;
     firstLoadRef.current = true;
     setCenterNodeName(null);
     setUrlFocus(null);
@@ -441,12 +493,51 @@ export default function MusicMapApp({
         }
         expandFrom(node.name);
       } else {
+        const requestToken = ++panelRequestTokenRef.current;
+        const cachedSeedPanelData =
+          node.name === seedArtist && panelData?.trackSource === 'spotify'
+            ? panelData
+            : null;
+
         setPanelOpen(true);
         setActivePanelArtist(node.name);
         setClientPanelData(null);
+
+        if (cachedSeedPanelData) {
+          const hasMissingPreviews = cachedSeedPanelData.tracks.some(
+            (track) => !track.preview_url
+          );
+          if (!hasMissingPreviews) {
+            setIsPanelTracksLoading(false);
+            return;
+          }
+
+          setIsPanelTracksLoading(true);
+          enrichTracksWithITunesPreviews(node.name, cachedSeedPanelData.tracks)
+            .then((tracks) => {
+              if (panelRequestTokenRef.current !== requestToken) return;
+              setClientPanelData({
+                artist: cachedSeedPanelData.artist,
+                tracks,
+                trackSource: cachedSeedPanelData.trackSource,
+              });
+              setIsPanelTracksLoading(false);
+            })
+            .catch(() => {
+              if (panelRequestTokenRef.current !== requestToken) return;
+              setIsPanelTracksLoading(false);
+            });
+          return;
+        }
+
+        setIsPanelTracksLoading(true);
         fetchPanelDataClient(node.name)
           .then((data) => {
-            setClientPanelData(data);
+            if (panelRequestTokenRef.current !== requestToken) return;
+            setClientPanelData((current) =>
+              shouldReplacePanelData(current, data) ? data : current
+            );
+            setIsPanelTracksLoading(false);
             // If we obtained an image from Spotify that the node lacks, update it
             const img = data?.artist?.image;
             if (img) {
@@ -463,12 +554,16 @@ export default function MusicMapApp({
               });
             }
           })
-          .catch(() =>
-            setClientPanelData({ artist: null, tracks: [], trackSource: null })
-          );
+          .catch(() => {
+            if (panelRequestTokenRef.current !== requestToken) return;
+            setClientPanelData(
+              (current) => current ?? { artist: null, tracks: [], trackSource: null }
+            );
+            setIsPanelTracksLoading(false);
+          });
       }
     },
-    [mode, expandFrom, centerNodeName]
+    [mode, expandFrom, centerNodeName, seedArtist, panelData]
   );
 
   const handleExpandFromPanel = useCallback(
@@ -479,9 +574,11 @@ export default function MusicMapApp({
   );
 
   const handleClosePanel = useCallback(() => {
+    panelRequestTokenRef.current++;
     setPanelOpen(false);
     setActivePanelArtist(null);
     setClientPanelData(null);
+    setIsPanelTracksLoading(false);
   }, []);
 
   const overlayMessage = isExpanding
@@ -554,6 +651,7 @@ export default function MusicMapApp({
           artist={clientPanelData?.artist ?? null}
           tracks={clientPanelData?.tracks ?? []}
           trackSource={clientPanelData?.trackSource ?? null}
+          isTracksLoading={isPanelTracksLoading}
           onClose={handleClosePanel}
           onExpand={handleExpandFromPanel}
         />

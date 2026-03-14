@@ -13,6 +13,8 @@ const nextConfig = {
       // Last.fm (two CDNs commonly used)
       { protocol: 'https', hostname: 'lastfm.freetls.fastly.net' },
       { protocol: 'https', hostname: 'lastfm-img2.akamaized.net' },
+      // Apple artwork used by the iTunes fallback path
+      { protocol: 'https', hostname: '**.mzstatic.com' },
     ],
   },
   async headers() {
@@ -21,8 +23,8 @@ const nextConfig = {
       "default-src 'self'",
       // Allow Next.js inline hydration and HMR/dev scripts
       `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ''} https://static.cloudflareinsights.com`,
-      // Images from self (CF resize) + Spotify + Last.fm + data URIs
-      "img-src 'self' https://i.scdn.co https://lastfm.freetls.fastly.net https://lastfm-img2.akamaized.net data:",
+      // Images from self (CF resize) + Spotify + Last.fm + Apple artwork + data URIs
+      "img-src 'self' https://i.scdn.co https://lastfm.freetls.fastly.net https://lastfm-img2.akamaized.net https://*.mzstatic.com data:",
       // Audio previews from Spotify and iTunes
       "media-src 'self' https://*.scdn.co https://*.spotifycdn.com https://audio-ssl.itunes.apple.com",
       // App/API calls (fetch/XHR)

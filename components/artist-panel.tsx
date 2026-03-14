@@ -47,6 +47,7 @@ interface ArtistPanelProps {
   artist: ArtistDetails | null;
   tracks: TrackData[];
   trackSource: TrackSource;
+  isTracksLoading?: boolean;
   onClose: () => void;
   onExpand?: (artist: string) => void;
 }
@@ -56,6 +57,7 @@ export default function ArtistPanel({
   artist,
   tracks,
   trackSource,
+  isTracksLoading = false,
   onClose,
   onExpand,
 }: ArtistPanelProps) {
@@ -182,6 +184,7 @@ export default function ArtistPanel({
 
   const topTracks = tracks.slice(0, 10);
   const hasAnyPlayablePreview = topTracks.some((track) => !!track.preview_url);
+  const showLoadingTracks = !!artist && isTracksLoading && topTracks.length === 0;
 
   return (
     <AnimatePresence>
@@ -292,30 +295,54 @@ export default function ArtistPanel({
                     </div>
                   )}
 
-                  {tracks.length > 0 && (
+                  {(tracks.length > 0 || showLoadingTracks) && (
                     <div>
                       <div className="flex items-center justify-between mb-3">
                         <h4 className="text-sm font-medium text-gray-400">
                           Top Tracks
                         </h4>
                         <div className="flex items-center gap-2">
-                          <Volume2 className="w-4 h-4 text-gray-500" />
-                          <input
-                            type="range"
-                            min={0}
-                            max={1}
-                            step={0.01}
-                            value={volume}
-                            onChange={(e) =>
-                              setVolume(parseFloat(e.target.value))
-                            }
-                            className="accent-sky-500 h-1 w-24"
-                            aria-label="Preview volume"
-                          />
+                          {showLoadingTracks && (
+                            <span className="text-[11px] uppercase tracking-[0.2em] text-gray-500">
+                              Loading
+                            </span>
+                          )}
+                          {topTracks.length > 0 && (
+                            <>
+                              <Volume2 className="w-4 h-4 text-gray-500" />
+                              <input
+                                type="range"
+                                min={0}
+                                max={1}
+                                step={0.01}
+                                value={volume}
+                                onChange={(e) =>
+                                  setVolume(parseFloat(e.target.value))
+                                }
+                                className="accent-sky-500 h-1 w-24"
+                                aria-label="Preview volume"
+                              />
+                            </>
+                          )}
                         </div>
                       </div>
 
                       <div className="space-y-2">
+                        {showLoadingTracks &&
+                          Array.from({ length: 5 }).map((_, idx) => (
+                            <div
+                              key={`loading-track-${idx}`}
+                              className="flex items-center gap-3 p-3 rounded-lg bg-gray-800/20"
+                            >
+                              <div className="h-8 w-8 rounded-full bg-gray-700/70 animate-pulse" />
+                              <div className="flex-1 min-w-0 space-y-2">
+                                <div className="h-3 rounded bg-gray-700/70 animate-pulse" />
+                                <div className="h-2 w-2/3 rounded bg-gray-800 animate-pulse" />
+                              </div>
+                              <div className="h-3 w-8 rounded bg-gray-800 animate-pulse" />
+                            </div>
+                          ))}
+
                         {topTracks.map((track) => {
                           const canPlay = !!track.preview_url;
                           const isThisPlaying =
@@ -379,7 +406,7 @@ export default function ArtistPanel({
                         {trackSource === 'spotify'
                           ? 'Spotify Top Tracks (30s previews where available)'
                           : trackSource === 'lastfm'
-                          ? 'Last.fm Top Tracks (no previews available)'
+                          ? 'Last.fm Top Tracks (iTunes previews where available)'
                           : '—'}
                       </p>
                     </div>
