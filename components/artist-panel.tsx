@@ -47,6 +47,7 @@ interface ArtistPanelProps {
   artist: ArtistDetails | null;
   tracks: TrackData[];
   trackSource: TrackSource;
+  tracksLoading?: boolean;
   onClose: () => void;
   onExpand?: (artist: string) => void;
 }
@@ -56,6 +57,7 @@ export default function ArtistPanel({
   artist,
   tracks,
   trackSource,
+  tracksLoading,
   onClose,
   onExpand,
 }: ArtistPanelProps) {
@@ -289,6 +291,13 @@ export default function ArtistPanel({
                           </span>
                         ))}
                       </div>
+                    </div>
+                  )}
+
+                  {tracksLoading && tracks.length === 0 && (
+                    <div className="flex items-center gap-2 text-gray-500 text-sm py-2">
+                      <div className="h-3 w-3 rounded-full border border-gray-600 border-t-gray-400 animate-spin" />
+                      <span>Loading tracks...</span>
                     </div>
                   )}
 
