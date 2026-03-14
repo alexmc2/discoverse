@@ -1,5 +1,5 @@
 // app/sitemap.ts
-import { POPULAR_ARTISTS_POOL } from '@/lib/popular-artists-IN-PROGRESS';
+import { POPULAR_ARTISTS_POOL } from '@/lib/popular-artists';
 import { getTopChartArtistNames } from '@/lib/lastfm';
 import type { MetadataRoute } from 'next';
 

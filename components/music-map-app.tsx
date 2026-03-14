@@ -457,12 +457,20 @@ export default function MusicMapApp({
           .then((data) => {
             setClientPanelData(data);
             setTracksLoading(false);
-            // Save to shared KV cache (fire-and-forget)
-            fetch('/api/search-cache', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ artist: node.name, type: 'panel', data }),
-            }).catch(() => {});
+            // Save to shared KV cache (fire-and-forget) — skip if Spotify
+            // tracks all lack previews (iTunes was likely down; let the next
+            // user retry instead of caching broken data for 180 days).
+            const allPreviewsNull =
+              data.trackSource === 'spotify' &&
+              data.tracks.length > 0 &&
+              data.tracks.every((t) => t.preview_url === null);
+            if (!allPreviewsNull) {
+              fetch('/api/search-cache', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ artist: node.name, type: 'panel', data }),
+              }).catch(() => {});
+            }
             // If we obtained an image from Spotify that the node lacks, update it
             const img = data?.artist?.image;
             if (img) {
