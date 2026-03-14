@@ -25,6 +25,8 @@ export default function SearchBar({
   const searchRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const debounceRef = useRef<NodeJS.Timeout | undefined>(undefined);
+  const requestSeqRef = useRef(0);
+  const navigatingRef = useRef(false);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -39,6 +41,8 @@ export default function SearchBar({
   // Clear & collapse on reset
   useEffect(() => {
     if (resetSignal === undefined) return;
+    requestSeqRef.current += 1;
+    navigatingRef.current = false;
     setQuery('');
     setSuggestions([]);
     setSelectedIndex(-1);
@@ -48,15 +52,24 @@ export default function SearchBar({
 
   useEffect(() => {
     if (query.length < 2) {
+      requestSeqRef.current += 1;
       setSuggestions([]);
+      setSelectedIndex(-1);
+      setShowSuggestions(false);
       return;
     }
     if (debounceRef.current) clearTimeout(debounceRef.current);
 
+    navigatingRef.current = false;
+    const requestId = ++requestSeqRef.current;
+    const currentQuery = query;
+
     debounceRef.current = setTimeout(async () => {
-      const results = await searchArtist(query);
+      const results = await searchArtist(currentQuery);
+      if (requestSeqRef.current !== requestId || navigatingRef.current) return;
       setSuggestions(results);
-      setShowSuggestions(true);
+      setSelectedIndex(-1);
+      setShowSuggestions(results.length > 0);
     }, 300);
 
     return () => {
@@ -67,6 +80,10 @@ export default function SearchBar({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (query.trim()) {
+      requestSeqRef.current += 1;
+      navigatingRef.current = true;
+      setSuggestions([]);
+      setSelectedIndex(-1);
       onSearch(query.trim());
       setShowSuggestions(false);
       inputRef.current?.blur(); // collapse
@@ -74,10 +91,13 @@ export default function SearchBar({
   };
 
   const handleSelectSuggestion = (artist: Artist) => {
+    requestSeqRef.current += 1;
+    navigatingRef.current = true;
     setQuery(artist.name);
-    onSearch(artist.name);
+    setSuggestions([]);
     setShowSuggestions(false);
     setSelectedIndex(-1);
+    onSearch(artist.name);
     inputRef.current?.blur(); // collapse
   };
 
@@ -160,6 +180,7 @@ export default function SearchBar({
               {suggestions.map((artist, index) => (
                 <button
                   key={artist.id}
+                  type="button"
                   onClick={() => handleSelectSuggestion(artist)}
                   onMouseEnter={() => setSelectedIndex(index)}
                   className={`w-full px-4 py-3 transition-colors text-left cursor-pointer ${
