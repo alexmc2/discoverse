@@ -23,17 +23,17 @@ export function AboutContent() {
       </p>
 
       <p className="mb-4 text-base sm:text-lg text-slate-300/90">
-        Discoverse is an interactive music discovery platform that visualises
-        artist connections in an explorable music map. Discover new music
-        through the relationships between your favorite artists.
+        Discover new music through the relationships between your favorite
+        artists. Discoverse is an interactive music discovery app that
+        visualises artist connections in an interactive music map.
       </p>
 
       <p className="mb-4 text-base sm:text-lg text-slate-300/90">
         Start with an artist you already know, then explore similar artists on a
         force-directed map. Click on any artist image to open info panel that
-        contains bios and track previews where available. The app is built
-        with Next.js and TypeScript, and uses the Last.fm, Spotify, and iTunes
-        APIs for data.
+        contains bios and track previews where available. The app is built with
+        Next.js and TypeScript, and uses the Last.fm, Spotify, and iTunes APIs
+        for data.
       </p>
       <p className="text-base sm:text-lg text-slate-300/90">
         I&apos;m Alex McGarry, a full-stack developer focused on Next.js, React,
