@@ -13,7 +13,7 @@ const Player = dynamic(
 
 export function AboutContent() {
   return (
-    <div className="max-w-4xl w-full text-center">
+    <div className="max-w-3xl w-full text-center">
       <h1 className="text-3xl sm:text-4xl font-semibold text-slate-100 mb-6">
         About Discoverse
       </h1>
@@ -23,32 +23,32 @@ export function AboutContent() {
       </p>
 
       <p className="mb-4 text-base sm:text-lg text-slate-300/90">
-        Discoverse is an interactive music discovery platform that visualises
-        artist connections in an explorable music map. Discover new music
-        through the relationships between your favorite artists using data from
-        Last.fm and Spotify.
+        Discover new music through the relationships between your favorite
+        artists. Discoverse is an interactive music discovery app that
+        visualises artist connections in an interactive music map.
       </p>
 
       <p className="mb-4 text-base sm:text-lg text-slate-300/90">
         Start with an artist you already know, then explore similar artists on a
         force-directed map. Click on any artist image to open info panel that
-        contains bios, tags and track previews where available. The app is built
-        with Next.js and TypeScript, leveraging the Last.fm and Spotify APIs for
-        data.
+        contains bios and track previews where available. The app is built with
+        Next.js and TypeScript, and uses the Last.fm, Spotify, and iTunes APIs
+        for data.
       </p>
-      <p className=" text-base sm:text-lg text-slate-300/90">
-        Are you looking for a Next.js developer to build your next web
-        application? I&apos;m currently available for freelance projects. Visit
-        my website at{' '}
+      <p className="text-base sm:text-lg text-slate-300/90">
+        I&apos;m Alex McGarry, a full-stack developer focused on Next.js, React,
+        TypeScript, and PostgreSQL. I&apos;m currently open to frontend,
+        backend, or full-stack roles, and Discoverse is a good example of the
+        kind of interactive, user-focused products I enjoy building. Visit{' '}
         <a
           href="https://amcgarry.co.uk"
           target="_blank"
           rel="noopener"
           className="text-sky-400 hover:text-sky-500"
         >
-          amcgarry.co.uk{' '}
-        </a>
-        to see my portfolio and get in touch.
+          amcgarry.co.uk
+        </a>{' '}
+        to see more of my work and get in touch.
       </p>
       <div className="relative mx-auto h-32 w-32 sm:h-40 sm:w-40 mb-6">
         <Player
@@ -66,7 +66,7 @@ export function AboutContent() {
 
       <p className="text-xs text-slate-500 mt-4">
         Landing page image: &quot;Daft Punk in 2013&quot; by Sony Music
-        Entertainment, additional editing by W.carter,{' '}
+        Entertainment{' '}
         <a
           href="https://commons.wikimedia.org/w/index.php?curid=144852275"
           target="_blank"
