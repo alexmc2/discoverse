@@ -10,6 +10,7 @@
     "deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy",
     "lint": "eslint",
     "refresh:artist-cache": "node --experimental-strip-types --import ./scripts/register-ts-loader.mjs scripts/refresh-artist-cache.mjs",
+    "refresh:graph-cache": "node --experimental-strip-types --import ./scripts/register-ts-loader.mjs scripts/refresh-graph-cache.mjs",
     "kv:upload-artist-cache": "node scripts/upload-artist-cache-to-kv.mjs"
   },
   "dependencies": {
