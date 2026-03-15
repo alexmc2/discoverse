@@ -11,7 +11,9 @@
     "lint": "eslint",
     "refresh:artist-cache": "node --experimental-strip-types --import ./scripts/register-ts-loader.mjs scripts/refresh-artist-cache.mjs",
     "refresh:graph-cache": "node --experimental-strip-types --import ./scripts/register-ts-loader.mjs scripts/refresh-graph-cache.mjs",
-    "kv:upload-artist-cache": "node scripts/upload-artist-cache-to-kv.mjs"
+    "kv:upload-artist-cache": "node scripts/upload-artist-cache-to-kv.mjs",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@lottiefiles/react-lottie-player": "^3.6.0",
@@ -34,14 +36,21 @@
     "@eslint/eslintrc": "^3",
     "@opennextjs/cloudflare": "^1.6.5",
     "@tailwindcss/postcss": "^4",
+    "@testing-library/dom": "^10.4.1",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@vitejs/plugin-react": "^6.0.1",
     "eslint": "^9",
     "eslint-config-next": "15.5.0",
+    "jsdom": "^28.1.0",
     "tailwindcss": "^4",
     "tw-animate-css": "^1.3.7",
     "typescript": "^5",
+    "vitest": "^4.1.0",
     "wrangler": "^4.33.1"
   }
 }
