@@ -1,12 +1,13 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-
+/**
+ * @jest-environment node
+ */
 const mockKV = {
-  get: vi.fn(),
-  put: vi.fn().mockResolvedValue(undefined),
+  get: jest.fn(),
+  put: jest.fn().mockResolvedValue(undefined),
 };
 
-vi.mock('@/lib/server/cache', () => ({
-  getKV: vi.fn(() => mockKV),
+jest.mock('@/lib/server/cache', () => ({
+  getKV: jest.fn(() => mockKV),
 }));
 
 import { POST } from '@/app/api/search-cache/route';
@@ -21,7 +22,7 @@ function makeRequest(body: unknown): Request {
 
 describe('POST /api/search-cache', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    jest.clearAllMocks();
   });
 
   it('stores graph data in KV with correct key', async () => {
@@ -34,14 +35,13 @@ describe('POST /api/search-cache', () => {
     const body = await res.json();
     expect(body.ok).toBe(true);
 
-    expect(mockKV.put).toHaveBeenCalledOnce();
+    expect(mockKV.put).toHaveBeenCalledTimes(1);
     const [key, payload, opts] = mockKV.put.mock.calls[0];
     expect(key).toBe('search-cache:v1:graph:radiohead');
     const stored = JSON.parse(payload);
     expect(stored.data).toEqual(graphData);
     expect(stored.v).toBe(1);
-    expect(stored.cachedAt).toBeTypeOf('number');
-    // 180 days TTL
+    expect(typeof stored.cachedAt).toBe('number');
     expect(opts.expirationTtl).toBe(180 * 24 * 60 * 60);
   });
 
@@ -106,10 +106,9 @@ describe('POST /api/search-cache', () => {
 
 describe('POST /api/search-cache (no KV)', () => {
   it('returns 503 when KV is not available', async () => {
-    // Re-mock with null KV
-    vi.resetModules();
-    vi.doMock('@/lib/server/cache', () => ({
-      getKV: vi.fn(() => null),
+    jest.resetModules();
+    jest.doMock('@/lib/server/cache', () => ({
+      getKV: jest.fn(() => null),
     }));
 
     const { POST: POST2 } = await import('@/app/api/search-cache/route');

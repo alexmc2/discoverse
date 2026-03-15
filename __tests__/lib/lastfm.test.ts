@@ -1,15 +1,13 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-
 // Mock cache so lastfm calls pass through to our mocked fetch
-vi.mock('@/lib/server/cache', () => ({
-  cacheJSON: vi.fn((_key: string, _ttl: number, fetcher: () => Promise<unknown>) => fetcher()),
-  cacheKey: vi.fn((...args: unknown[]) => String(args)),
-  getKV: vi.fn(() => null),
+jest.mock('@/lib/server/cache', () => ({
+  cacheJSON: jest.fn((_key: string, _ttl: number, fetcher: () => Promise<unknown>) => fetcher()),
+  cacheKey: jest.fn((...args: unknown[]) => String(args)),
+  getKV: jest.fn(() => null),
 }));
 
 // Mock spotify (lastfm imports getArtistImage from spotify)
-vi.mock('@/lib/spotify', () => ({
-  getArtistImage: vi.fn(() => Promise.resolve(undefined)),
+jest.mock('@/lib/spotify', () => ({
+  getArtistImage: jest.fn(() => Promise.resolve(undefined)),
 }));
 
 import {
@@ -42,12 +40,12 @@ describe('searchArtist', () => {
 
   beforeEach(() => {
     process.env.NEXT_PUBLIC_LASTFM_API_KEY = 'test-key';
-    globalThis.fetch = vi.fn();
+    globalThis.fetch = jest.fn() as jest.Mock;
   });
 
   afterEach(() => {
     globalThis.fetch = originalFetch;
-    vi.restoreAllMocks();
+    jest.restoreAllMocks();
   });
 
   it('returns empty array for empty query', async () => {
@@ -56,7 +54,7 @@ describe('searchArtist', () => {
   });
 
   it('returns filtered artists above minimum listeners', async () => {
-    (globalThis.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
+    (globalThis.fetch as jest.Mock).mockResolvedValue({
       ok: true,
       json: () =>
         Promise.resolve({
@@ -80,7 +78,7 @@ describe('searchArtist', () => {
   });
 
   it('uses custom minListeners threshold', async () => {
-    (globalThis.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
+    (globalThis.fetch as jest.Mock).mockResolvedValue({
       ok: true,
       json: () =>
         Promise.resolve({
@@ -107,7 +105,7 @@ describe('getSimilarArtists', () => {
 
   beforeEach(() => {
     process.env.NEXT_PUBLIC_LASTFM_API_KEY = 'test-key';
-    globalThis.fetch = vi.fn();
+    globalThis.fetch = jest.fn() as jest.Mock;
   });
 
   afterEach(() => {
@@ -115,7 +113,7 @@ describe('getSimilarArtists', () => {
   });
 
   it('returns similar artists with match scores', async () => {
-    (globalThis.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
+    (globalThis.fetch as jest.Mock).mockResolvedValue({
       ok: true,
       json: () =>
         Promise.resolve({
@@ -138,7 +136,7 @@ describe('getSimilarArtists', () => {
   });
 
   it('handles empty response', async () => {
-    (globalThis.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
+    (globalThis.fetch as jest.Mock).mockResolvedValue({
       ok: true,
       json: () => Promise.resolve({ similarartists: {} }),
     });
@@ -153,7 +151,7 @@ describe('getArtistTags', () => {
 
   beforeEach(() => {
     process.env.NEXT_PUBLIC_LASTFM_API_KEY = 'test-key';
-    globalThis.fetch = vi.fn();
+    globalThis.fetch = jest.fn() as jest.Mock;
   });
 
   afterEach(() => {
@@ -161,7 +159,7 @@ describe('getArtistTags', () => {
   });
 
   it('returns top 5 tags', async () => {
-    (globalThis.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
+    (globalThis.fetch as jest.Mock).mockResolvedValue({
       ok: true,
       json: () =>
         Promise.resolve({
@@ -185,7 +183,7 @@ describe('getArtistTags', () => {
   });
 
   it('handles empty tags', async () => {
-    (globalThis.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
+    (globalThis.fetch as jest.Mock).mockResolvedValue({
       ok: true,
       json: () => Promise.resolve({ toptags: {} }),
     });
@@ -200,7 +198,7 @@ describe('getArtistInfo', () => {
 
   beforeEach(() => {
     process.env.NEXT_PUBLIC_LASTFM_API_KEY = 'test-key';
-    globalThis.fetch = vi.fn();
+    globalThis.fetch = jest.fn() as jest.Mock;
   });
 
   afterEach(() => {
@@ -208,7 +206,7 @@ describe('getArtistInfo', () => {
   });
 
   it('returns parsed artist info', async () => {
-    (globalThis.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
+    (globalThis.fetch as jest.Mock).mockResolvedValue({
       ok: true,
       json: () =>
         Promise.resolve({
@@ -238,7 +236,7 @@ describe('getArtistInfo', () => {
   });
 
   it('strips HTML from bio and truncates at "Read more"', async () => {
-    (globalThis.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
+    (globalThis.fetch as jest.Mock).mockResolvedValue({
       ok: true,
       json: () =>
         Promise.resolve({
@@ -256,7 +254,7 @@ describe('getArtistInfo', () => {
   });
 
   it('returns null when artist not found', async () => {
-    (globalThis.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
+    (globalThis.fetch as jest.Mock).mockResolvedValue({
       ok: true,
       json: () => Promise.resolve({}),
     });
@@ -271,7 +269,7 @@ describe('getTopTracks', () => {
 
   beforeEach(() => {
     process.env.NEXT_PUBLIC_LASTFM_API_KEY = 'test-key';
-    globalThis.fetch = vi.fn();
+    globalThis.fetch = jest.fn() as jest.Mock;
   });
 
   afterEach(() => {
@@ -279,7 +277,7 @@ describe('getTopTracks', () => {
   });
 
   it('returns parsed tracks', async () => {
-    (globalThis.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
+    (globalThis.fetch as jest.Mock).mockResolvedValue({
       ok: true,
       json: () =>
         Promise.resolve({
@@ -319,7 +317,7 @@ describe('getTopChartArtistNames', () => {
 
   beforeEach(() => {
     process.env.NEXT_PUBLIC_LASTFM_API_KEY = 'test-key';
-    globalThis.fetch = vi.fn();
+    globalThis.fetch = jest.fn() as jest.Mock;
   });
 
   afterEach(() => {
@@ -327,7 +325,7 @@ describe('getTopChartArtistNames', () => {
   });
 
   it('returns chart artist names', async () => {
-    (globalThis.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
+    (globalThis.fetch as jest.Mock).mockResolvedValue({
       ok: true,
       json: () =>
         Promise.resolve({
@@ -335,7 +333,7 @@ describe('getTopChartArtistNames', () => {
             artist: [
               { name: 'Taylor Swift' },
               { name: 'The Weeknd' },
-              { name: '' }, // should be filtered
+              { name: '' },
               { name: 'Drake' },
             ],
           },

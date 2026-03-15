@@ -1,25 +1,23 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-
-// Mock the cache module so lastfm/spotify don't hit real caches
-vi.mock('@/lib/server/cache', () => ({
-  cacheJSON: vi.fn((_key: string, _ttl: number, fetcher: () => Promise<unknown>) => fetcher()),
-  cacheKey: vi.fn((...args: unknown[]) => String(args)),
-  getKV: vi.fn(() => null),
-  getCached: vi.fn(() => Promise.resolve(null)),
-  setCached: vi.fn(() => Promise.resolve()),
+// Mock the cache module so spotify doesn't hit real caches
+jest.mock('@/lib/server/cache', () => ({
+  cacheJSON: jest.fn((_key: string, _ttl: number, fetcher: () => Promise<unknown>) => fetcher()),
+  cacheKey: jest.fn((...args: unknown[]) => String(args)),
+  getKV: jest.fn(() => null),
+  getCached: jest.fn(() => Promise.resolve(null)),
+  setCached: jest.fn(() => Promise.resolve()),
 }));
 
 describe('spotify module', () => {
   const originalFetch = globalThis.fetch;
 
   beforeEach(() => {
-    vi.resetModules();
-    globalThis.fetch = vi.fn();
+    jest.resetModules();
+    globalThis.fetch = jest.fn() as jest.Mock;
   });
 
   afterEach(() => {
     globalThis.fetch = originalFetch;
-    vi.restoreAllMocks();
+    jest.restoreAllMocks();
   });
 
   describe('searchSpotifyArtist', () => {
@@ -32,8 +30,7 @@ describe('spotify module', () => {
         popularity: 80,
       };
 
-      (globalThis.fetch as ReturnType<typeof vi.fn>)
-        // Token request
+      (globalThis.fetch as jest.Mock)
         .mockResolvedValueOnce({
           ok: true,
           json: () =>
@@ -43,7 +40,6 @@ describe('spotify module', () => {
               expires_in: 3600,
             }),
         })
-        // Search request
         .mockResolvedValueOnce({
           ok: true,
           json: () =>
@@ -59,7 +55,7 @@ describe('spotify module', () => {
     });
 
     it('returns null when search has no results', async () => {
-      (globalThis.fetch as ReturnType<typeof vi.fn>)
+      (globalThis.fetch as jest.Mock)
         .mockResolvedValueOnce({
           ok: true,
           json: () =>
@@ -84,7 +80,7 @@ describe('spotify module', () => {
     });
 
     it('returns null when no token is available', async () => {
-      (globalThis.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
+      (globalThis.fetch as jest.Mock).mockResolvedValue({
         ok: false,
         status: 401,
       });
@@ -110,7 +106,7 @@ describe('spotify module', () => {
         popularity: 80,
       };
 
-      (globalThis.fetch as ReturnType<typeof vi.fn>)
+      (globalThis.fetch as jest.Mock)
         .mockResolvedValueOnce({
           ok: true,
           json: () =>
@@ -141,7 +137,7 @@ describe('spotify module', () => {
         popularity: 80,
       };
 
-      (globalThis.fetch as ReturnType<typeof vi.fn>)
+      (globalThis.fetch as jest.Mock)
         .mockResolvedValueOnce({
           ok: true,
           json: () =>
@@ -172,7 +168,7 @@ describe('spotify module', () => {
         popularity: 80,
       };
 
-      (globalThis.fetch as ReturnType<typeof vi.fn>)
+      (globalThis.fetch as jest.Mock)
         .mockResolvedValueOnce({
           ok: true,
           json: () =>
@@ -205,7 +201,7 @@ describe('spotify module', () => {
         popularity: 80,
       };
 
-      (globalThis.fetch as ReturnType<typeof vi.fn>)
+      (globalThis.fetch as jest.Mock)
         .mockResolvedValueOnce({
           ok: true,
           json: () =>
@@ -249,8 +245,7 @@ describe('spotify module', () => {
         },
       ];
 
-      (globalThis.fetch as ReturnType<typeof vi.fn>)
-        // Token
+      (globalThis.fetch as jest.Mock)
         .mockResolvedValueOnce({
           ok: true,
           json: () =>
@@ -260,13 +255,11 @@ describe('spotify module', () => {
               expires_in: 3600,
             }),
         })
-        // Search artist
         .mockResolvedValueOnce({
           ok: true,
           json: () =>
             Promise.resolve({ artists: { items: [mockArtist] } }),
         })
-        // Top tracks
         .mockResolvedValueOnce({
           ok: true,
           json: () => Promise.resolve({ tracks: mockTracks }),
@@ -281,7 +274,7 @@ describe('spotify module', () => {
     });
 
     it('returns empty array when no token available', async () => {
-      (globalThis.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
+      (globalThis.fetch as jest.Mock).mockResolvedValue({
         ok: false,
         status: 401,
       });

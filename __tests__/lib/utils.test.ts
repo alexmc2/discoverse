@@ -1,4 +1,3 @@
-import { describe, it, expect } from 'vitest';
 import { cn } from '@/lib/utils';
 
 describe('cn', () => {
@@ -11,7 +10,6 @@ describe('cn', () => {
   });
 
   it('deduplicates tailwind conflicts', () => {
-    // twMerge should resolve conflicting tailwind classes
     expect(cn('p-4', 'p-2')).toBe('p-2');
     expect(cn('text-red-500', 'text-blue-500')).toBe('text-blue-500');
   });

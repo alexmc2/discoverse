@@ -1,4 +1,3 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { cacheKey, cacheJSON, getCached, setCached } from '@/lib/server/cache';
 
 describe('cacheKey', () => {
@@ -29,23 +28,23 @@ describe('cacheKey', () => {
 
 describe('cacheJSON (memory fallback)', () => {
   it('calls fetcher on cache miss and returns result', async () => {
-    const fetcher = vi.fn().mockResolvedValue({ data: 'fresh' });
+    const fetcher = jest.fn().mockResolvedValue({ data: 'fresh' });
     const result = await cacheJSON('test-miss', 60, fetcher);
     expect(result).toEqual({ data: 'fresh' });
-    expect(fetcher).toHaveBeenCalledOnce();
+    expect(fetcher).toHaveBeenCalledTimes(1);
   });
 
   it('returns cached value on subsequent calls', async () => {
-    const fetcher = vi.fn().mockResolvedValue({ data: 'cached' });
+    const fetcher = jest.fn().mockResolvedValue({ data: 'cached' });
     const key = 'test-hit-' + Date.now();
     await cacheJSON(key, 60, fetcher);
     const result = await cacheJSON(key, 60, fetcher);
     expect(result).toEqual({ data: 'cached' });
-    expect(fetcher).toHaveBeenCalledOnce();
+    expect(fetcher).toHaveBeenCalledTimes(1);
   });
 
   it('re-fetches after TTL expires', async () => {
-    const fetcher = vi
+    const fetcher = jest
       .fn()
       .mockResolvedValueOnce({ v: 1 })
       .mockResolvedValueOnce({ v: 2 });
@@ -62,12 +61,12 @@ describe('cacheJSON (memory fallback)', () => {
 });
 
 describe('cacheJSON (KV path)', () => {
-  let mockKV: { get: ReturnType<typeof vi.fn>; put: ReturnType<typeof vi.fn> };
+  let mockKV: { get: jest.Mock; put: jest.Mock };
 
   beforeEach(() => {
     mockKV = {
-      get: vi.fn(),
-      put: vi.fn().mockResolvedValue(undefined),
+      get: jest.fn(),
+      put: jest.fn().mockResolvedValue(undefined),
     };
     (globalThis as Record<string, unknown>).MUSIC_CACHE = mockKV;
   });
@@ -78,7 +77,7 @@ describe('cacheJSON (KV path)', () => {
 
   it('returns parsed value from KV on cache hit', async () => {
     mockKV.get.mockResolvedValue(JSON.stringify({ name: 'Radiohead' }));
-    const fetcher = vi.fn();
+    const fetcher = jest.fn();
 
     const result = await cacheJSON('kv-hit', 3600, fetcher);
 
@@ -89,12 +88,12 @@ describe('cacheJSON (KV path)', () => {
 
   it('calls fetcher and stores in KV on cache miss', async () => {
     mockKV.get.mockResolvedValue(null);
-    const fetcher = vi.fn().mockResolvedValue({ name: 'Bjork' });
+    const fetcher = jest.fn().mockResolvedValue({ name: 'Bjork' });
 
     const result = await cacheJSON('kv-miss', 3600, fetcher);
 
     expect(result).toEqual({ name: 'Bjork' });
-    expect(fetcher).toHaveBeenCalledOnce();
+    expect(fetcher).toHaveBeenCalledTimes(1);
     expect(mockKV.put).toHaveBeenCalledWith(
       'kv-miss',
       JSON.stringify({ name: 'Bjork' }),
@@ -104,22 +103,22 @@ describe('cacheJSON (KV path)', () => {
 
   it('falls through to memory when KV.get throws', async () => {
     mockKV.get.mockRejectedValue(new Error('KV unavailable'));
-    const fetcher = vi.fn().mockResolvedValue({ fallback: true });
+    const fetcher = jest.fn().mockResolvedValue({ fallback: true });
 
     const result = await cacheJSON('kv-error-' + Date.now(), 60, fetcher);
 
     expect(result).toEqual({ fallback: true });
-    expect(fetcher).toHaveBeenCalledOnce();
+    expect(fetcher).toHaveBeenCalledTimes(1);
   });
 });
 
 describe('getCached (KV path)', () => {
-  let mockKV: { get: ReturnType<typeof vi.fn>; put: ReturnType<typeof vi.fn> };
+  let mockKV: { get: jest.Mock; put: jest.Mock };
 
   beforeEach(() => {
     mockKV = {
-      get: vi.fn(),
-      put: vi.fn().mockResolvedValue(undefined),
+      get: jest.fn(),
+      put: jest.fn().mockResolvedValue(undefined),
     };
     (globalThis as Record<string, unknown>).MUSIC_CACHE = mockKV;
   });
@@ -148,12 +147,12 @@ describe('getCached (KV path)', () => {
 });
 
 describe('setCached (KV path)', () => {
-  let mockKV: { get: ReturnType<typeof vi.fn>; put: ReturnType<typeof vi.fn> };
+  let mockKV: { get: jest.Mock; put: jest.Mock };
 
   beforeEach(() => {
     mockKV = {
-      get: vi.fn(),
-      put: vi.fn().mockResolvedValue(undefined),
+      get: jest.fn(),
+      put: jest.fn().mockResolvedValue(undefined),
     };
     (globalThis as Record<string, unknown>).MUSIC_CACHE = mockKV;
   });
@@ -174,8 +173,6 @@ describe('setCached (KV path)', () => {
 
   it('falls through to memory when KV.put throws', async () => {
     mockKV.put.mockRejectedValue(new Error('KV write failed'));
-
-    // Should not throw — falls through to memory
     await expect(setCached('fail-key', { x: 1 }, 60)).resolves.toBeUndefined();
   });
 });

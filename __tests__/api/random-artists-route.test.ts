@@ -1,4 +1,6 @@
-import { describe, it, expect } from 'vitest';
+/**
+ * @jest-environment node
+ */
 import { GET } from '@/app/api/random-artists/route';
 import { POPULAR_ARTISTS_POOL } from '@/lib/popular-artists';
 

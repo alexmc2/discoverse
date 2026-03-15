@@ -1,4 +1,3 @@
-import { describe, it, expect } from 'vitest';
 import { getRandomArtists } from '@/lib/server/random-artists';
 import { POPULAR_ARTISTS_POOL } from '@/lib/popular-artists';
 

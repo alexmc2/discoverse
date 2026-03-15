@@ -1,4 +1,3 @@
-import { describe, it, expect } from 'vitest';
 import {
   getGenreColor,
   GENRE_COLOR_MAP,
@@ -28,20 +27,14 @@ describe('getGenreColor', () => {
   });
 
   it('matches subgenres via fuzzy contains', () => {
-    // "alternative rock" doesn't literally contain "alt rock",
-    // but it does contain "rock" so it matches rock via priority order
     expect(getGenreColor('alternative rock')).toBe(GENRE_COLOR_MAP.rock);
-    // "shoegaze revival" contains "shoegaze"
     expect(getGenreColor('shoegaze revival')).toBe(GENRE_COLOR_MAP.shoegaze);
     expect(getGenreColor('deep house music')).toBe(GENRE_COLOR_MAP.house);
   });
 
   it('prefers more specific genres over parents', () => {
-    // "post-punk" should match before "punk"
     expect(getGenreColor('post-punk revival')).toBe(GENRE_COLOR_MAP['post-punk']);
-    // "indie rock" should match before "rock" or "indie"
     expect(getGenreColor('indie rock')).toBe(GENRE_COLOR_MAP['indie rock']);
-    // "death metal" should match before "metal"
     expect(getGenreColor('death metal')).toBe(GENRE_COLOR_MAP['death metal']);
   });
 

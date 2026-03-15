@@ -1,14 +1,14 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import React from 'react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 // Mock lastfm's searchArtist to avoid real API calls
-vi.mock('@/lib/lastfm', () => ({
-  searchArtist: vi.fn().mockResolvedValue([]),
+jest.mock('@/lib/lastfm', () => ({
+  searchArtist: jest.fn().mockResolvedValue([]),
 }));
 
 // Mock framer-motion to avoid animation issues in tests
-vi.mock('framer-motion', () => ({
+jest.mock('framer-motion', () => ({
   motion: {
     div: ({ children, ...props }: React.PropsWithChildren<Record<string, unknown>>) => {
       const { initial, animate, exit, transition, ...rest } = props;
@@ -23,10 +23,10 @@ import SearchBar from '@/components/search-bar';
 import { searchArtist } from '@/lib/lastfm';
 
 describe('SearchBar', () => {
-  const mockOnSearch = vi.fn();
+  const mockOnSearch = jest.fn();
 
   beforeEach(() => {
-    vi.clearAllMocks();
+    jest.clearAllMocks();
   });
 
   it('renders the search input', () => {
@@ -65,7 +65,6 @@ describe('SearchBar', () => {
     const input = screen.getByPlaceholderText('Search for an artist...');
     await user.type(input, 'test');
 
-    // The X button should appear
     const clearButton = screen.getByRole('button');
     expect(clearButton).toBeInTheDocument();
   });
@@ -93,20 +92,19 @@ describe('SearchBar', () => {
   });
 
   it('shows suggestions when searchArtist returns results', async () => {
-    const user = userEvent.setup();
     const mockResults = [
       { id: '1', name: 'Radiohead', url: 'http://example.com' },
       { id: '2', name: 'Radio Moscow', url: 'http://example.com' },
     ];
-    (searchArtist as ReturnType<typeof vi.fn>).mockResolvedValue(mockResults);
+    (searchArtist as jest.Mock).mockResolvedValue(mockResults);
 
+    const user = userEvent.setup();
     render(<SearchBar onSearch={mockOnSearch} />);
 
     const input = screen.getByPlaceholderText('Search for an artist...');
     await user.type(input, 'Radio');
 
-    // Wait for debounce (300ms) + async resolution
-    await vi.waitFor(
+    await waitFor(
       () => {
         expect(screen.getByText('Radiohead')).toBeInTheDocument();
         expect(screen.getByText('Radio Moscow')).toBeInTheDocument();
@@ -116,18 +114,18 @@ describe('SearchBar', () => {
   });
 
   it('calls onSearch when a suggestion is clicked', async () => {
-    const user = userEvent.setup();
     const mockResults = [
       { id: '1', name: 'Radiohead', url: 'http://example.com' },
     ];
-    (searchArtist as ReturnType<typeof vi.fn>).mockResolvedValue(mockResults);
+    (searchArtist as jest.Mock).mockResolvedValue(mockResults);
 
+    const user = userEvent.setup();
     render(<SearchBar onSearch={mockOnSearch} />);
 
     const input = screen.getByPlaceholderText('Search for an artist...');
     await user.type(input, 'Radio');
 
-    await vi.waitFor(
+    await waitFor(
       () => {
         expect(screen.getByText('Radiohead')).toBeInTheDocument();
       },
@@ -152,7 +150,7 @@ describe('SearchBar', () => {
 
     rerender(<SearchBar onSearch={mockOnSearch} resetSignal={1} />);
 
-    await vi.waitFor(() => {
+    await waitFor(() => {
       expect(input.value).toBe('');
     });
   });

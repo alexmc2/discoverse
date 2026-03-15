@@ -1,11 +1,11 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-
-// Mock the lastfm module
-vi.mock('@/lib/lastfm', () => ({
-  isSupportedLastfmMethod: vi.fn((m: string) =>
+/**
+ * @jest-environment node
+ */
+jest.mock('@/lib/lastfm', () => ({
+  isSupportedLastfmMethod: jest.fn((m: string) =>
     ['artist.search', 'artist.getsimilar', 'artist.gettoptags', 'artist.getinfo', 'artist.gettoptracks', 'chart.gettopartists'].includes(m)
   ),
-  getLastfmMethodData: vi.fn(),
+  getLastfmMethodData: jest.fn(),
 }));
 
 import { GET } from '@/app/api/lastfm/route';
@@ -22,7 +22,7 @@ function makeRequest(params: Record<string, string>): NextRequest {
 
 describe('GET /api/lastfm', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    jest.clearAllMocks();
   });
 
   it('returns 400 when method parameter is missing', async () => {
@@ -41,7 +41,7 @@ describe('GET /api/lastfm', () => {
 
   it('forwards params and returns data for valid method', async () => {
     const mockData = { results: { artistmatches: { artist: [] } } };
-    (getLastfmMethodData as ReturnType<typeof vi.fn>).mockResolvedValue(mockData);
+    (getLastfmMethodData as jest.Mock).mockResolvedValue(mockData);
 
     const res = await GET(makeRequest({ method: 'artist.search', artist: 'Radiohead' }));
     expect(res.status).toBe(200);
@@ -55,7 +55,7 @@ describe('GET /api/lastfm', () => {
   });
 
   it('strips api_key and format from forwarded params', async () => {
-    (getLastfmMethodData as ReturnType<typeof vi.fn>).mockResolvedValue({});
+    (getLastfmMethodData as jest.Mock).mockResolvedValue({});
 
     await GET(
       makeRequest({
@@ -72,7 +72,7 @@ describe('GET /api/lastfm', () => {
   });
 
   it('adds default limit for methods that need it', async () => {
-    (getLastfmMethodData as ReturnType<typeof vi.fn>).mockResolvedValue({});
+    (getLastfmMethodData as jest.Mock).mockResolvedValue({});
 
     await GET(makeRequest({ method: 'artist.getsimilar', artist: 'Radiohead' }));
 
@@ -83,7 +83,7 @@ describe('GET /api/lastfm', () => {
   });
 
   it('does not override explicit limit', async () => {
-    (getLastfmMethodData as ReturnType<typeof vi.fn>).mockResolvedValue({});
+    (getLastfmMethodData as jest.Mock).mockResolvedValue({});
 
     await GET(makeRequest({ method: 'artist.getsimilar', artist: 'Radiohead', limit: '5' }));
 
@@ -94,9 +94,7 @@ describe('GET /api/lastfm', () => {
   });
 
   it('returns 500 when getLastfmMethodData throws', async () => {
-    (getLastfmMethodData as ReturnType<typeof vi.fn>).mockRejectedValue(
-      new Error('API down')
-    );
+    (getLastfmMethodData as jest.Mock).mockRejectedValue(new Error('API down'));
 
     const res = await GET(makeRequest({ method: 'artist.search', artist: 'Radiohead' }));
     expect(res.status).toBe(500);
@@ -105,7 +103,7 @@ describe('GET /api/lastfm', () => {
   });
 
   it('sets cache headers on success', async () => {
-    (getLastfmMethodData as ReturnType<typeof vi.fn>).mockResolvedValue({});
+    (getLastfmMethodData as jest.Mock).mockResolvedValue({});
 
     const res = await GET(makeRequest({ method: 'artist.getinfo', artist: 'Radiohead' }));
     expect(res.headers.get('Cache-Control')).toContain('s-maxage=300');

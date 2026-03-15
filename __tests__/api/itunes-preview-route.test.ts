@@ -1,16 +1,18 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+/**
+ * @jest-environment node
+ */
 import { GET } from '@/app/api/itunes-preview/route';
 
 describe('GET /api/itunes-preview', () => {
   const originalFetch = globalThis.fetch;
 
   beforeEach(() => {
-    globalThis.fetch = vi.fn();
+    globalThis.fetch = jest.fn() as jest.Mock;
   });
 
   afterEach(() => {
     globalThis.fetch = originalFetch;
-    vi.restoreAllMocks();
+    jest.restoreAllMocks();
   });
 
   function makeRequest(params: Record<string, string>): Request {
@@ -32,7 +34,7 @@ describe('GET /api/itunes-preview', () => {
   });
 
   it('returns preview URL for exact match', async () => {
-    (globalThis.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
+    (globalThis.fetch as jest.Mock).mockResolvedValue({
       ok: true,
       json: () =>
         Promise.resolve({
@@ -59,7 +61,7 @@ describe('GET /api/itunes-preview', () => {
   });
 
   it('falls back to first result with preview when no exact match', async () => {
-    (globalThis.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
+    (globalThis.fetch as jest.Mock).mockResolvedValue({
       ok: true,
       json: () =>
         Promise.resolve({
@@ -81,7 +83,7 @@ describe('GET /api/itunes-preview', () => {
   });
 
   it('returns null when no results found', async () => {
-    (globalThis.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
+    (globalThis.fetch as jest.Mock).mockResolvedValue({
       ok: true,
       json: () =>
         Promise.resolve({ resultCount: 0, results: [] }),
@@ -94,7 +96,7 @@ describe('GET /api/itunes-preview', () => {
   });
 
   it('returns null when iTunes API fails', async () => {
-    (globalThis.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
+    (globalThis.fetch as jest.Mock).mockResolvedValue({
       ok: false,
       status: 500,
     });
@@ -106,9 +108,7 @@ describe('GET /api/itunes-preview', () => {
   });
 
   it('returns null when fetch throws', async () => {
-    (globalThis.fetch as ReturnType<typeof vi.fn>).mockRejectedValue(
-      new Error('Network error')
-    );
+    (globalThis.fetch as jest.Mock).mockRejectedValue(new Error('Network error'));
 
     const res = await GET(makeRequest({ artist: 'Radiohead', track: 'Creep' }));
     const body = await res.json();
@@ -117,14 +117,14 @@ describe('GET /api/itunes-preview', () => {
   });
 
   it('encodes search term correctly in iTunes URL', async () => {
-    (globalThis.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
+    (globalThis.fetch as jest.Mock).mockResolvedValue({
       ok: true,
       json: () => Promise.resolve({ resultCount: 0, results: [] }),
     });
 
     await GET(makeRequest({ artist: 'Björk', track: 'Army of Me' }));
 
-    const fetchCall = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+    const fetchCall = (globalThis.fetch as jest.Mock).mock.calls[0];
     const calledUrl = fetchCall[0] as string;
     expect(calledUrl).toContain('itunes.apple.com/search');
     expect(calledUrl).toContain(encodeURIComponent('Björk Army of Me'));

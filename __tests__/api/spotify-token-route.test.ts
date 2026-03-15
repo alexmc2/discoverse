@@ -1,18 +1,19 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-
+/**
+ * @jest-environment node
+ */
 describe('POST /api/spotify/token', () => {
   const originalFetch = globalThis.fetch;
   const originalEnv = { ...process.env };
 
   beforeEach(() => {
-    vi.resetModules();
-    globalThis.fetch = vi.fn();
+    jest.resetModules();
+    globalThis.fetch = jest.fn() as jest.Mock;
   });
 
   afterEach(() => {
     globalThis.fetch = originalFetch;
     process.env = { ...originalEnv };
-    vi.restoreAllMocks();
+    jest.restoreAllMocks();
   });
 
   it('returns 501 when credentials are not configured', async () => {
@@ -45,7 +46,7 @@ describe('POST /api/spotify/token', () => {
       token_type: 'Bearer',
       expires_in: 3600,
     };
-    (globalThis.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
+    (globalThis.fetch as jest.Mock).mockResolvedValue({
       ok: true,
       json: () => Promise.resolve(tokenData),
     });
@@ -63,7 +64,7 @@ describe('POST /api/spotify/token', () => {
     process.env.SPOTIFY_CLIENT_ID = 'my-id';
     process.env.SPOTIFY_CLIENT_SECRET = 'my-secret';
 
-    (globalThis.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
+    (globalThis.fetch as jest.Mock).mockResolvedValue({
       ok: true,
       json: () =>
         Promise.resolve({
@@ -76,7 +77,7 @@ describe('POST /api/spotify/token', () => {
     const { POST } = await import('@/app/api/spotify/token/route');
     await POST();
 
-    const fetchCall = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+    const fetchCall = (globalThis.fetch as jest.Mock).mock.calls[0];
     expect(fetchCall[0]).toBe('https://accounts.spotify.com/api/token');
 
     const headers = fetchCall[1].headers;
@@ -89,7 +90,7 @@ describe('POST /api/spotify/token', () => {
     process.env.SPOTIFY_CLIENT_ID = 'real-id';
     process.env.SPOTIFY_CLIENT_SECRET = 'real-secret';
 
-    (globalThis.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
+    (globalThis.fetch as jest.Mock).mockResolvedValue({
       ok: false,
       status: 403,
       text: () => Promise.resolve('Forbidden'),
@@ -104,9 +105,7 @@ describe('POST /api/spotify/token', () => {
     process.env.SPOTIFY_CLIENT_ID = 'real-id';
     process.env.SPOTIFY_CLIENT_SECRET = 'real-secret';
 
-    (globalThis.fetch as ReturnType<typeof vi.fn>).mockRejectedValue(
-      new Error('Network error')
-    );
+    (globalThis.fetch as jest.Mock).mockRejectedValue(new Error('Network error'));
 
     const { POST } = await import('@/app/api/spotify/token/route');
     const res = await POST();
