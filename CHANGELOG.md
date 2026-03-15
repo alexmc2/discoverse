@@ -16,6 +16,7 @@ All notable changes to this project will be documented in this file.
 - Updated artist cache with refreshed data for default artist pool (PR #9).
 - Fixed default artist panel fallback so degraded KV entries no longer override healthier bundled `artist-cache.json` data for seeded artists.
 - Updated the `search-cache` panel fallback to reuse the same default artist quality checks instead of returning the raw KV default cache entry.
+- Broadened client-side cache read and write guards to reject any panel data with all-null previews, not just Spotify-sourced entries, preventing Last.fm fallback data from polluting the search cache.
 
 ### Changed
 - Updated about page.
