@@ -2,6 +2,48 @@
 import { getKV } from '@/lib/server/cache';
 
 const HARD_TTL_SECONDS = 180 * 24 * 60 * 60; // 180 days
+const ARTIST_CACHE_KV_KEY = 'artist-cache:v1';
+
+export async function GET(request: Request) {
+  const kv = getKV();
+  if (!kv) return Response.json({ data: null });
+
+  const { searchParams } = new URL(request.url);
+  const artist = searchParams.get('artist');
+  const type = searchParams.get('type');
+
+  if (!artist || (type !== 'graph' && type !== 'panel')) {
+    return Response.json({ data: null }, { status: 400 });
+  }
+
+  const normalized = artist.trim().toLowerCase();
+
+  try {
+    // Check search cache first
+    const searchKey = `search-cache:v1:${type}:${normalized}`;
+    const raw = await kv.get(searchKey);
+    if (raw) {
+      const envelope = JSON.parse(raw);
+      return Response.json({ data: envelope?.data ?? envelope });
+    }
+
+    // For panel data, also check the default artist cache
+    if (type === 'panel') {
+      const indexRaw = await kv.get(ARTIST_CACHE_KV_KEY);
+      if (indexRaw) {
+        const index = JSON.parse(indexRaw);
+        const entry = index[normalized];
+        if (entry?.panelData) {
+          return Response.json({ data: entry.panelData });
+        }
+      }
+    }
+
+    return Response.json({ data: null });
+  } catch {
+    return Response.json({ data: null });
+  }
+}
 
 export async function POST(request: Request) {
   const kv = getKV();
