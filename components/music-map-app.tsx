@@ -422,10 +422,16 @@ export default function MusicMapApp({
       const trimmed = artistName?.trim();
       if (!trimmed) return;
       const nextHref = `/?q=${encodeURIComponent(trimmed)}`;
-      const normalizedCurrent = normalizeArtistName(seedArtist);
+      // Read the live URL instead of relying on the server prop so a client-side
+      // reset to "/" does not get mistaken for an active same-artist search.
+      const currentQueryArtist =
+        typeof window === 'undefined'
+          ? seedArtist?.trim() ?? null
+          : new URLSearchParams(window.location.search).get('q')?.trim() ?? null;
+      const normalizedCurrent = normalizeArtistName(currentQueryArtist);
       const normalizedNext = normalizeArtistName(trimmed);
       const isSameArtistSearch = normalizedCurrent === normalizedNext;
-      const isExactSearch = seedArtist?.trim() === trimmed;
+      const isExactSearch = currentQueryArtist === trimmed;
 
       setPanelOpen(false);
       setActivePanelArtist(null);
