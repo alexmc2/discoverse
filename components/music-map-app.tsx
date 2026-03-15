@@ -163,7 +163,12 @@ async function fetchPanelDataClient(artistName: string): Promise<PanelData> {
     if (res.ok) {
       const { data } = await res.json();
       if (data?.artist && data?.tracks?.length > 0) {
-        return data as PanelData;
+        const isBadSpotifyCache =
+          data.trackSource === 'spotify' &&
+          data.tracks.every((t: { preview_url: string | null }) => !t.preview_url);
+        if (!isBadSpotifyCache) {
+          return data as PanelData;
+        }
       }
     }
   } catch {
