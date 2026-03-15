@@ -512,10 +512,10 @@ export default function MusicMapApp({
             // tracks lack previews (Spotify/iTunes was likely down, or data
             // fell back to Last.fm; let the next user retry instead of
             // caching broken data for 180 days).
-            const allPreviewsNull =
+            const allPreviewsMissing =
               data.tracks.length > 0 &&
-              data.tracks.every((t) => t.preview_url === null);
-            if (!allPreviewsNull) {
+              data.tracks.every((t) => !t.preview_url);
+            if (!allPreviewsMissing) {
               fetch('/api/search-cache', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },

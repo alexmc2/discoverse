@@ -96,6 +96,19 @@ describe('POST /api/search-cache', () => {
     expect(key).toBe('search-cache:v1:graph:bj%C3%B6rk');
   });
 
+  it('encodes reserved characters in artist name', async () => {
+    await POST(
+      makeRequest({
+        artist: 'Simon & Garfunkel',
+        type: 'graph',
+        data: { nodes: [] },
+      })
+    );
+
+    const [key] = mockKV.put.mock.calls[0];
+    expect(key).toBe('search-cache:v1:graph:simon%20%26%20garfunkel');
+  });
+
   it('returns 400 for invalid body', async () => {
     const res = await POST(
       new Request('http://localhost:3000/api/search-cache', {
