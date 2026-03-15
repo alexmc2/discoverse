@@ -155,7 +155,7 @@ describe('GET /api/search-cache', () => {
 
   it('falls back to the healthier bundled default artist panel when KV data is degraded', async () => {
     mockKV.get.mockImplementation(async (key: string) => {
-      if (key === 'search-cache:v1:panel:led zeppelin') return null;
+      if (key === 'search-cache:v1:panel:led%20zeppelin') return null;
       if (key === 'artist-cache:v1') {
         return JSON.stringify({
           'led zeppelin': {
