@@ -44,7 +44,7 @@ Live site: `https://discoverse.co.uk`
 
 ## Stack
 
-- Frontend: Next.js App Router, React, TypeScript, Tailwind CSS, Framer Motion
+- Frontend: Next.js App Router, React, TypeScript, Tailwind CSS, Lottie for animations
 - Visualisation: `react-force-graph-2d`
 - Runtime and deployment: OpenNext, Cloudflare Workers, Cloudflare KV
 - Tooling: ESLint, Jest, Testing Library
