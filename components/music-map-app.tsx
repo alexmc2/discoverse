@@ -155,6 +155,26 @@ function mergeGraphs(
 }
 
 async function fetchPanelDataClient(artistName: string): Promise<PanelData> {
+  // Check KV cache first (shared across all users)
+  try {
+    const res = await fetch(
+      `/api/search-cache?artist=${encodeURIComponent(artistName)}&type=panel`
+    );
+    if (res.ok) {
+      const { data } = await res.json();
+      if (data?.artist && data?.tracks?.length > 0) {
+        const isBadSpotifyCache =
+          data.trackSource === 'spotify' &&
+          data.tracks.every((t: { preview_url: string | null }) => !t.preview_url);
+        if (!isBadSpotifyCache) {
+          return data as PanelData;
+        }
+      }
+    }
+  } catch {
+    /* fall through to fresh fetch */
+  }
+
   const [info, spotifyImg, spotifyUrl] = await Promise.all([
     getArtistInfo(artistName),
     getArtistImage(artistName),
