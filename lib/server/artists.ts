@@ -64,7 +64,8 @@ const DEFAULT_ARTIST_SET = new Set(
   POPULAR_ARTISTS_POOL.map((artist) => artist.trim().toLowerCase()),
 );
 
-let cachedArtistIndexPromise: Promise<CachedArtistIndex | null> | null = null;
+let kvArtistIndexPromise: Promise<CachedArtistIndex | null> | null = null;
+let bundledArtistIndexPromise: Promise<CachedArtistIndex | null> | null = null;
 
 const ARTIST_CACHE_KV_KEY = 'artist-cache:v1';
 const SEARCH_CACHE_GRAPH_KEY = 'search-cache:v1:graph:';
@@ -74,26 +75,111 @@ function normalizeArtistName(artistName: string): string {
   return artistName.trim().toLowerCase();
 }
 
-async function loadCachedArtistIndex(): Promise<CachedArtistIndex | null> {
-  if (!cachedArtistIndexPromise) {
-    cachedArtistIndexPromise = (async () => {
-      // Try KV first (production)
+function getPlayablePreviewCount(tracks: TrackData[] | undefined): number {
+  return (tracks ?? []).filter((track) => !!track.preview_url).length;
+}
+
+function getRichTrackCount(tracks: TrackData[] | undefined): number {
+  return (tracks ?? []).filter((track) => {
+    const hasAlbumName = !!track.album?.name && track.album.name !== '—';
+    const hasAlbumArt = (track.album?.images?.length ?? 0) > 0;
+    const hasDuration = (track.duration_ms ?? 0) > 0;
+    const hasPopularity = (track.popularity ?? 0) > 0;
+    return hasAlbumName || hasAlbumArt || hasDuration || hasPopularity;
+  }).length;
+}
+
+function getPanelDataQuality(
+  panelData: CachedArtistEntry['panelData'] | null | undefined
+): number {
+  if (!panelData) return -1;
+
+  const tracks = panelData.tracks ?? [];
+  const playablePreviewCount = getPlayablePreviewCount(tracks);
+  const richTrackCount = getRichTrackCount(tracks);
+  const sourceScore =
+    panelData.trackSource === 'spotify'
+      ? 20
+      : panelData.trackSource === 'lastfm'
+      ? 5
+      : 0;
+
+  return (
+    sourceScore +
+    tracks.length +
+    playablePreviewCount * 100 +
+    richTrackCount * 10 +
+    (panelData.artist ? 1 : 0)
+  );
+}
+
+function chooseBestPanelData(
+  preferred: CachedArtistEntry['panelData'] | null | undefined,
+  fallback: CachedArtistEntry['panelData'] | null | undefined
+): CachedArtistEntry['panelData'] | null {
+  if (!preferred) return fallback ?? null;
+  if (!fallback) return preferred;
+
+  return getPanelDataQuality(fallback) > getPanelDataQuality(preferred)
+    ? fallback
+    : preferred;
+}
+
+async function loadKVArtistIndex(): Promise<CachedArtistIndex | null> {
+  if (!kvArtistIndexPromise) {
+    kvArtistIndexPromise = (async () => {
       const kv = getKV();
-      if (kv) {
-        try {
-          const raw = await kv.get(ARTIST_CACHE_KV_KEY);
-          if (raw) return JSON.parse(raw) as CachedArtistIndex;
-        } catch {
-          /* fall through */
-        }
+      if (!kv) return null;
+      try {
+        const raw = await kv.get(ARTIST_CACHE_KV_KEY);
+        return raw ? (JSON.parse(raw) as CachedArtistIndex) : null;
+      } catch {
+        return null;
       }
-      // Fallback: static JSON (local dev)
-      return import('@/data/artist-cache.json')
-        .then((mod) => mod.default as CachedArtistIndex)
-        .catch(() => null);
     })();
   }
-  return cachedArtistIndexPromise;
+  return kvArtistIndexPromise;
+}
+
+async function loadBundledArtistIndex(): Promise<CachedArtistIndex | null> {
+  if (!bundledArtistIndexPromise) {
+    bundledArtistIndexPromise = import('@/data/artist-cache.json')
+      .then((mod) => mod.default as CachedArtistIndex)
+      .catch(() => null);
+  }
+  return bundledArtistIndexPromise;
+}
+
+async function getDefaultArtistEntry(
+  artistName: string
+): Promise<CachedArtistEntry | null> {
+  const normalized = normalizeArtistName(artistName);
+  if (!normalized || !DEFAULT_ARTIST_SET.has(normalized)) {
+    return null;
+  }
+
+  const [kvIndex, bundledIndex] = await Promise.all([
+    loadKVArtistIndex(),
+    loadBundledArtistIndex(),
+  ]);
+
+  const kvEntry = kvIndex?.[normalized];
+  const bundledEntry = bundledIndex?.[normalized];
+  const graphData = kvEntry?.graphData ?? bundledEntry?.graphData;
+  const panelData = chooseBestPanelData(
+    kvEntry?.panelData ?? null,
+    bundledEntry?.panelData ?? null
+  );
+
+  if (!graphData && !panelData) {
+    return null;
+  }
+
+  return {
+    graphData,
+    panelData: panelData ?? undefined,
+    lastUpdated: kvEntry?.lastUpdated ?? bundledEntry?.lastUpdated,
+  };
 }
 
 export async function fetchGraphData(artistName: string) {
@@ -147,21 +233,24 @@ export async function getDefaultArtistBootstrap(artistName: string): Promise<{
     trackSource: TrackSource;
   } | null;
 } | null> {
-  const normalized = normalizeArtistName(artistName);
-  if (!normalized || !DEFAULT_ARTIST_SET.has(normalized)) {
-    return null;
-  }
-
-  const index = await loadCachedArtistIndex();
-  if (!index) return null;
-
-  const cached = index[normalized];
+  const cached = await getDefaultArtistEntry(artistName);
   if (!cached?.graphData) return null;
 
   return {
     graphData: cached.graphData,
     panelData: cached.panelData ?? null,
   };
+}
+
+export async function getDefaultArtistPanelData(
+  artistName: string
+): Promise<{
+  artist: ArtistDetails | null;
+  tracks: TrackData[];
+  trackSource: TrackSource;
+} | null> {
+  const cached = await getDefaultArtistEntry(artistName);
+  return cached?.panelData ?? null;
 }
 
 export async function getSearchCacheBootstrap(artistName: string): Promise<{
