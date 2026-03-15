@@ -575,7 +575,7 @@ export default function MusicMapApp({
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-sky-900/20 via-blue-900/20 to-indigo-900/20" />
 
       {showDefault && (
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute inset-0 hidden overflow-hidden pointer-events-none sm:block">
           <Image
             src="/dp-image.jpg"
             alt=""
