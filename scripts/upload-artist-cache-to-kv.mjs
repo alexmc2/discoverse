@@ -15,13 +15,13 @@ const key = 'artist-cache:v1';
 
 console.log(`Uploading ${file} to KV key "${key}" (preview)...`);
 execSync(
-  `npx wrangler kv key put "${key}" --binding MUSIC_CACHE --path ${file} --preview`,
+  `npx wrangler kv key put "${key}" --binding MUSIC_CACHE --path ${file} --preview --remote`,
   { stdio: 'inherit' }
 );
 
 console.log(`Uploading ${file} to KV key "${key}" (production)...`);
 execSync(
-  `npx wrangler kv key put "${key}" --binding MUSIC_CACHE --path ${file}`,
+  `npx wrangler kv key put "${key}" --binding MUSIC_CACHE --path ${file} --preview false --remote`,
   { stdio: 'inherit' }
 );
 
