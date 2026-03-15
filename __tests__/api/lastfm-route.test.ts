@@ -8,7 +8,7 @@ jest.mock('@/lib/lastfm', () => ({
   getLastfmMethodData: jest.fn(),
 }));
 
-import { GET } from '@/app/api/lastfm/route';
+import { GET, POST } from '@/app/api/lastfm/route';
 import { getLastfmMethodData } from '@/lib/lastfm';
 import { NextRequest } from 'next/server';
 
@@ -107,5 +107,51 @@ describe('GET /api/lastfm', () => {
 
     const res = await GET(makeRequest({ method: 'artist.getinfo', artist: 'Radiohead' }));
     expect(res.headers.get('Cache-Control')).toContain('s-maxage=300');
+  });
+});
+
+function makePostRequest(body: Record<string, unknown>): NextRequest {
+  return new NextRequest('http://localhost:3000/api/lastfm', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+}
+
+describe('POST /api/lastfm', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('returns correct data for artist names containing &', async () => {
+    const mockData = { artist: { name: 'Iron & Wine' } };
+    (getLastfmMethodData as jest.Mock).mockResolvedValue(mockData);
+
+    const res = await POST(
+      makePostRequest({ method: 'artist.getinfo', artist: 'Iron & Wine' })
+    );
+    expect(res.status).toBe(200);
+    expect(getLastfmMethodData).toHaveBeenCalledWith('artist.getinfo', {
+      artist: 'Iron & Wine',
+    });
+  });
+
+  it('returns 400 when method is missing', async () => {
+    const res = await POST(makePostRequest({ artist: 'Radiohead' }));
+    expect(res.status).toBe(400);
+  });
+
+  it('returns 400 for unsupported method', async () => {
+    const res = await POST(makePostRequest({ method: 'user.getinfo' }));
+    expect(res.status).toBe(400);
+  });
+
+  it('returns 500 when getLastfmMethodData throws', async () => {
+    (getLastfmMethodData as jest.Mock).mockRejectedValue(new Error('API down'));
+
+    const res = await POST(
+      makePostRequest({ method: 'artist.search', artist: 'Radiohead' })
+    );
+    expect(res.status).toBe(500);
   });
 });
