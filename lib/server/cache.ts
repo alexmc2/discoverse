@@ -79,7 +79,7 @@ export async function cacheJSON<T>(
 export function cacheKey(parts: Array<string | number | undefined | null>): string {
   return parts
     .filter((p) => p !== undefined && p !== null)
-    .map((p) => String(p))
+    .map((p) => encodeURIComponent(String(p)))
     .join(':')
     .slice(0, 1024); // guard against extreme keys
 }

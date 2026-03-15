@@ -84,7 +84,7 @@ describe('POST /api/search-cache', () => {
 
     expect(res.status).toBe(200);
     const [key] = mockKV.put.mock.calls[0];
-    expect(key).toBe('search-cache:v1:panel:radiohead');
+    expect(key).toBe('search-cache:v1:panel:radiohead'); // no special chars, unchanged
   });
 
   it('normalizes artist name to lowercase', async () => {
@@ -93,7 +93,7 @@ describe('POST /api/search-cache', () => {
     );
 
     const [key] = mockKV.put.mock.calls[0];
-    expect(key).toBe('search-cache:v1:graph:björk');
+    expect(key).toBe('search-cache:v1:graph:bj%C3%B6rk');
   });
 
   it('returns 400 for invalid body', async () => {

@@ -263,7 +263,7 @@ export async function getSearchCacheBootstrap(artistName: string): Promise<{
 } | null> {
   const kv = getKV();
   if (!kv) return null;
-  const normalized = normalizeArtistName(artistName);
+  const normalized = encodeURIComponent(normalizeArtistName(artistName));
 
   try {
     const graphRaw = await kv.get(SEARCH_CACHE_GRAPH_KEY + normalized);
