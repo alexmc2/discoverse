@@ -84,7 +84,7 @@ describe('POST /api/search-cache', () => {
 
     expect(res.status).toBe(200);
     const [key] = mockKV.put.mock.calls[0];
-    expect(key).toBe('search-cache:v1:panel:radiohead');
+    expect(key).toBe('search-cache:v1:panel:radiohead'); // no special chars, unchanged
   });
 
   it('normalizes artist name to lowercase', async () => {
@@ -93,7 +93,20 @@ describe('POST /api/search-cache', () => {
     );
 
     const [key] = mockKV.put.mock.calls[0];
-    expect(key).toBe('search-cache:v1:graph:björk');
+    expect(key).toBe('search-cache:v1:graph:bj%C3%B6rk');
+  });
+
+  it('encodes reserved characters in artist name', async () => {
+    await POST(
+      makeRequest({
+        artist: 'Simon & Garfunkel',
+        type: 'graph',
+        data: { nodes: [] },
+      })
+    );
+
+    const [key] = mockKV.put.mock.calls[0];
+    expect(key).toBe('search-cache:v1:graph:simon%20%26%20garfunkel');
   });
 
   it('returns 400 for invalid body', async () => {
@@ -142,7 +155,7 @@ describe('GET /api/search-cache', () => {
 
   it('falls back to the healthier bundled default artist panel when KV data is degraded', async () => {
     mockKV.get.mockImplementation(async (key: string) => {
-      if (key === 'search-cache:v1:panel:led zeppelin') return null;
+      if (key === 'search-cache:v1:panel:led%20zeppelin') return null;
       if (key === 'artist-cache:v1') {
         return JSON.stringify({
           'led zeppelin': {

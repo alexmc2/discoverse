@@ -16,7 +16,7 @@ export async function GET(request: Request) {
     return Response.json({ data: null }, { status: 400 });
   }
 
-  const normalized = artist.trim().toLowerCase();
+  const normalized = encodeURIComponent(artist.trim().toLowerCase());
 
   try {
     // Check search cache first
@@ -63,7 +63,7 @@ export async function POST(request: Request) {
     return Response.json({ ok: false }, { status: 400 });
   }
 
-  const normalized = artist.trim().toLowerCase();
+  const normalized = encodeURIComponent(artist.trim().toLowerCase());
   const key = `search-cache:v1:${type}:${normalized}`;
   const envelope = { v: 1, cachedAt: Date.now(), data };
 

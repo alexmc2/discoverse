@@ -163,10 +163,9 @@ async function fetchPanelDataClient(artistName: string): Promise<PanelData> {
     if (res.ok) {
       const { data } = await res.json();
       if (data?.artist && data?.tracks?.length > 0) {
-        const isBadSpotifyCache =
-          data.trackSource === 'spotify' &&
+        const allPreviewsMissing =
           data.tracks.every((t: { preview_url: string | null }) => !t.preview_url);
-        if (!isBadSpotifyCache) {
+        if (!allPreviewsMissing) {
           return data as PanelData;
         }
       }
@@ -509,14 +508,14 @@ export default function MusicMapApp({
           .then((data) => {
             setClientPanelData(data);
             setTracksLoading(false);
-            // Save to shared KV cache (fire-and-forget) — skip if Spotify
-            // tracks all lack previews (iTunes was likely down; let the next
-            // user retry instead of caching broken data for 180 days).
-            const allPreviewsNull =
-              data.trackSource === 'spotify' &&
+            // Save to shared KV cache (fire-and-forget) — skip if all
+            // tracks lack previews (Spotify/iTunes was likely down, or data
+            // fell back to Last.fm; let the next user retry instead of
+            // caching broken data for 180 days).
+            const allPreviewsMissing =
               data.tracks.length > 0 &&
-              data.tracks.every((t) => t.preview_url === null);
-            if (!allPreviewsNull) {
+              data.tracks.every((t) => !t.preview_url);
+            if (!allPreviewsMissing) {
               fetch('/api/search-cache', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
