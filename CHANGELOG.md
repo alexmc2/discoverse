@@ -9,6 +9,7 @@ All notable changes to this project will be documented in this file.
 - Migrated testing framework from Vitest to Jest using `next/jest`, avoiding an esbuild version conflict with wrangler and OpenNext.
 - Test coverage includes cache routes, Spotify and Last.fm helpers, random artist selection, genres, utilities, and the search bar component.
 - Added regression tests covering default artists with degraded KV panel data and healthier bundled JSON fallback.
+- Added `POST /api/lastfm` regression tests covering artist names containing `&`.
 
 ### Fixed
 - Fixed cache retrieval so that KV reads correctly unwrap the envelope format and handle missing entries without errors (PR #11).
@@ -17,7 +18,7 @@ All notable changes to this project will be documented in this file.
 - Fixed default artist panel fallback so degraded KV entries no longer override healthier bundled `artist-cache.json` data for seeded artists.
 - Updated the `search-cache` panel fallback to reuse the same default artist quality checks instead of returning the raw KV default cache entry.
 - Broadened client-side cache read and write guards to reject any panel data with all-null previews, not just Spotify-sourced entries, preventing Last.fm fallback data from polluting the search cache.
-- Fixed artists with `&` or other special characters (e.g. Echo & the Bunnymen, Simon & Garfunkel) returning wrong Last.fm data and failing to cache, by URL-encoding all KV cache keys.
+- Switched client-side Last.fm proxy calls from GET query params to `POST /api/lastfm` with a JSON body so artist names containing `&` are no longer truncated into the wrong panel artist metadata.
 
 ### Changed
 - Updated about page.

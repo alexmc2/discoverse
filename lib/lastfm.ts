@@ -139,15 +139,16 @@ async function lastfmGet<T>(
       return (await res.json()) as T;
     });
   } else {
-    // Client-side: use /api/lastfm proxy to avoid CORS blocks
-    const proxyUrl = new URL('/api/lastfm', window.location.origin);
-    proxyUrl.searchParams.set('method', method);
-    for (const [k, v] of Object.entries(params)) {
-      proxyUrl.searchParams.set(k, String(v));
-    }
-    const finalUrl = proxyUrl.toString();
+    // Client-side: use /api/lastfm proxy to avoid CORS blocks.
+    // POST with JSON body so "&" in artist names isn't mangled by
+    // URL-parameter parsing on the Cloudflare/OpenNext edge.
     return cacheJSON<T>(key, ttlSeconds, async () => {
-      const res = await fetch(finalUrl, { cache: 'no-store' });
+      const res = await fetch('/api/lastfm', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ method, ...params }),
+        cache: 'no-store',
+      });
       if (!res.ok) throw new Error(`Last.fm error ${res.status} for ${method}`);
       return (await res.json()) as T;
     });
