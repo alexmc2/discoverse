@@ -12,7 +12,7 @@ export const metadata: Metadata = {
 
 export default function AboutPage() {
   return (
-    <main className="min-h-screen bg-gradient-to-br from-sky-950/10 via-blue-900/10 to-indigo-950/10 ">
+    <main className="h-screen overflow-y-auto sm:overflow-hidden bg-gradient-to-br from-sky-950/10 via-blue-900/10 to-indigo-950/10">
       <div className='p-4'>
         <Link
           href="/"
@@ -26,7 +26,7 @@ export default function AboutPage() {
           </span>
         </Link>
       </div>
-      <div className="flex items-center justify-center min-h-screen px-4">
+      <div className="flex items-center justify-center px-4 py-8 sm:min-h-[calc(100vh-60px)]">
         <AboutContent />
       </div>
     </main>
