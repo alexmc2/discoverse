@@ -19,6 +19,7 @@ All notable changes to this project will be documented in this file.
 - Updated the `search-cache` panel fallback to reuse the same default artist quality checks instead of returning the raw KV default cache entry.
 - Broadened client-side cache read and write guards to reject any panel data with all-null previews, not just Spotify-sourced entries, preventing Last.fm fallback data from polluting the search cache.
 - Switched client-side Last.fm proxy calls from GET query params to `POST /api/lastfm` with a JSON body so artist names containing `&` are no longer truncated into the wrong panel artist metadata.
+- Fixed repeat searches from the dropdown after `Reset Graph` so reselecting the same cached artist now navigates back to `/?q=...` instead of refreshing the landing page. The client search flow now checks the live URL query before deciding whether to `refresh()` or `replace()`.
 
 ### Changed
 - Updated about page.
