@@ -10,7 +10,38 @@ jest.mock('@/lib/server/cache', () => ({
   getKV: jest.fn(() => mockKV),
 }));
 
+jest.mock('@/data/artist-cache.json', () => ({
+  __esModule: true,
+  default: {
+    'led zeppelin': {
+      graphData: { nodes: [{ id: 'led-zeppelin' }], links: [] },
+      panelData: {
+        artist: {
+          name: 'Led Zeppelin',
+          url: 'https://www.last.fm/music/Led+Zeppelin',
+          listeners: 1000,
+          playcount: 1000,
+          tags: [],
+        },
+        tracks: [
+          {
+            id: 'lz-spotify-1',
+            name: 'Stairway to Heaven',
+            preview_url: 'https://example.com/preview.mp3',
+            duration_ms: 482000,
+            popularity: 100,
+            album: { name: 'Led Zeppelin IV', images: [] },
+            artists: [{ name: 'Led Zeppelin' }],
+          },
+        ],
+        trackSource: 'spotify',
+      },
+    },
+  },
+}));
+
 import { POST } from '@/app/api/search-cache/route';
+import { GET } from '@/app/api/search-cache/route';
 
 function makeRequest(body: unknown): Request {
   return new Request('http://localhost:3000/api/search-cache', {
@@ -101,6 +132,61 @@ describe('POST /api/search-cache', () => {
       makeRequest({ artist: 'Radiohead', type: 'graph', data: {} })
     );
     expect(res.status).toBe(500);
+  });
+});
+
+describe('GET /api/search-cache', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('falls back to the healthier bundled default artist panel when KV data is degraded', async () => {
+    mockKV.get.mockImplementation(async (key: string) => {
+      if (key === 'search-cache:v1:panel:led zeppelin') return null;
+      if (key === 'artist-cache:v1') {
+        return JSON.stringify({
+          'led zeppelin': {
+            graphData: { nodes: [{ id: 'led-zeppelin' }], links: [] },
+            panelData: {
+              artist: {
+                name: 'Led Zeppelin',
+                url: 'https://www.last.fm/music/Led+Zeppelin',
+                listeners: 1,
+                playcount: 1,
+                tags: [],
+              },
+              tracks: [
+                {
+                  id: 'lz-1',
+                  name: 'Stairway to Heaven',
+                  preview_url: null,
+                  duration_ms: 0,
+                  popularity: 0,
+                  album: { name: '—', images: [] },
+                  artists: [{ name: 'Led Zeppelin' }],
+                },
+              ],
+              trackSource: 'lastfm',
+            },
+          },
+        });
+      }
+      return null;
+    });
+
+    const res = await GET(
+      new Request(
+        'http://localhost:3000/api/search-cache?artist=Led%20Zeppelin&type=panel'
+      )
+    );
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.data.trackSource).toBe('spotify');
+    expect(body.data.tracks.length).toBeGreaterThan(0);
+    expect(body.data.tracks.some((track: { preview_url: string | null }) => !!track.preview_url)).toBe(
+      true
+    );
   });
 });
 

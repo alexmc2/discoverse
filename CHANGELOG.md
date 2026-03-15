@@ -5,14 +5,17 @@ All notable changes to this project will be documented in this file.
 ## [2026-03-15] -  Cache hardening and test suite
 
 ### Added
-- Added Jest test suite with 12 test files covering API routes, shared library code, and component behaviour (PR #10).
+- Added Jest test suite with 13 test files covering API routes, shared library code, and component behaviour (PR #10).
 - Migrated testing framework from Vitest to Jest using `next/jest`, avoiding an esbuild version conflict with wrangler and OpenNext.
 - Test coverage includes cache routes, Spotify and Last.fm helpers, random artist selection, genres, utilities, and the search bar component.
+- Added regression tests covering default artists with degraded KV panel data and healthier bundled JSON fallback.
 
 ### Fixed
 - Fixed cache retrieval so that KV reads correctly unwrap the envelope format and handle missing entries without errors (PR #11).
 - Added a quality gate on search cache writes to prevent bad data (e.g. tracks with zero preview URLs due to rate limiting) from being persisted to KV for 180 days (PR #11).
 - Updated artist cache with refreshed data for default artist pool (PR #9).
+- Fixed default artist panel fallback so degraded KV entries no longer override healthier bundled `artist-cache.json` data for seeded artists.
+- Updated the `search-cache` panel fallback to reuse the same default artist quality checks instead of returning the raw KV default cache entry.
 
 ### Changed
 - Updated about page.
