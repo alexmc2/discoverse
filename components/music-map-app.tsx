@@ -287,10 +287,12 @@ export async function fetchPanelDataClient(
   }
 
   const data = { artist, tracks, trackSource };
+  const playable = playablePreviewCount(tracks);
   return {
     data,
     shouldCache:
-      previewLookupSucceeded && playablePreviewCount(tracks) > 0,
+      playable > 0 &&
+      (trackSource === 'spotify' || previewLookupSucceeded),
   };
 }
 

@@ -377,7 +377,7 @@ export default function ArtistPanel({
                         })}
                       </div>
 
-                      {!hasAnyPlayablePreview && (
+                      {!tracksLoading && !hasAnyPlayablePreview && (
                         <p className="mt-2 text-[11px] text-gray-500">
                           No 30-second previews are currently available for these tracks.
                         </p>

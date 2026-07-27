@@ -354,6 +354,41 @@ describe('fetchPanelDataClient', () => {
     expect(result.data.tracks).toEqual(cachedTracks);
   });
 
+  it('caches native Spotify previews when iTunes enrichment fails', async () => {
+    const spotifyTracks = [
+      makeTrack('Ordinary World', 'https://audio.example/ordinary.m4a'),
+      makeTrack('Come Undone', null),
+    ];
+    (globalThis.fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ data: null }),
+    });
+    mockGetArtistInfo.mockResolvedValue({
+      name: 'Duran Duran',
+      url: 'https://last.fm/music/Duran+Duran',
+      listeners: 1,
+      playcount: 2,
+      tags: ['new wave'],
+    });
+    mockGetArtistImage.mockResolvedValue(
+      'https://images.example/duran.jpg'
+    );
+    mockGetArtistSpotifyUrl.mockResolvedValue(
+      'https://open.spotify.com/artist/duran'
+    );
+    mockGetArtistTopTracksWithPreviews.mockResolvedValue({
+      tracks: spotifyTracks,
+      previewLookupSucceeded: false,
+    });
+
+    const result = await fetchPanelDataClient('Duran Duran');
+
+    expect(result.shouldCache).toBe(true);
+    expect(result.data.trackSource).toBe('spotify');
+    expect(result.data.tracks).toEqual(spotifyTracks);
+    expect(mockGetLastFmTopTracks).not.toHaveBeenCalled();
+  });
+
   it('enriches Last.fm tracks when Spotify top tracks are unavailable', async () => {
     (globalThis.fetch as jest.Mock).mockResolvedValue({
       ok: true,

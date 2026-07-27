@@ -25,7 +25,12 @@ export async function GET(request: Request) {
   const result = await lookupITunesTracks(
     artist,
     [{ name: track, artist }],
-    country
+    country,
+    {
+      searchTerm: `${artist} ${track}`,
+      limit: 25,
+      artistTermOnly: false,
+    }
   );
   if (!result.lookupSucceeded) {
     return Response.json(

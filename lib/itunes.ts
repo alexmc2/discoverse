@@ -28,6 +28,12 @@ export interface ITunesLookupResult {
   upstreamStatus?: number;
 }
 
+interface ITunesLookupOptions {
+  searchTerm?: string;
+  limit?: number;
+  artistTermOnly?: boolean;
+}
+
 const EDITION_QUALIFIER =
   /\b(remaster(?:ed)?|version|edit|mix|live|acoustic|mono|stereo|anniversary|deluxe)\b/i;
 
@@ -140,21 +146,28 @@ export function normalizeITunesCountry(country?: string): string {
 export async function lookupITunesTracks(
   artistName: string,
   tracks: ITunesTrackRequest[],
-  country?: string
+  country?: string,
+  options: ITunesLookupOptions = {}
 ): Promise<ITunesLookupResult> {
   const emptyMatches = tracks.map(() => ({ previewUrl: null }));
   if (!artistName.trim() || tracks.length === 0) {
     return { matches: emptyMatches, lookupSucceeded: true };
   }
 
+  const limit = Math.min(
+    200,
+    Math.max(1, Math.round(options.limit ?? 200))
+  );
   const params = new URLSearchParams({
-    term: artistName,
+    term: options.searchTerm?.trim() || artistName,
     country: normalizeITunesCountry(country),
     media: 'music',
     entity: 'song',
-    attribute: 'artistTerm',
-    limit: '200',
+    limit: String(limit),
   });
+  if (options.artistTermOnly !== false) {
+    params.set('attribute', 'artistTerm');
+  }
 
   try {
     const response = await fetch(`https://itunes.apple.com/search?${params}`, {

@@ -97,7 +97,7 @@ describe('/api/itunes-preview', () => {
       await expect(response.json()).resolves.toEqual({ previewUrl: null });
     });
 
-    it('uses one artist-wide Apple search with a normalized country', async () => {
+    it('uses a targeted Apple search with a normalized country', async () => {
       (globalThis.fetch as jest.Mock).mockResolvedValue({
         ok: true,
         status: 200,
@@ -117,10 +117,10 @@ describe('/api/itunes-preview', () => {
       ).mock.calls[0] as [string, RequestInit];
       const url = new URL(calledUrl);
       expect(url.hostname).toBe('itunes.apple.com');
-      expect(url.searchParams.get('term')).toBe('Björk');
-      expect(url.searchParams.get('attribute')).toBe('artistTerm');
+      expect(url.searchParams.get('term')).toBe('Björk Army of Me');
+      expect(url.searchParams.has('attribute')).toBe(false);
       expect(url.searchParams.get('entity')).toBe('song');
-      expect(url.searchParams.get('limit')).toBe('200');
+      expect(url.searchParams.get('limit')).toBe('25');
       expect(url.searchParams.get('country')).toBe('US');
       expect(options.cache).toBe('no-store');
     });
@@ -231,6 +231,12 @@ describe('/api/itunes-preview', () => {
         ],
       });
       expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+      const appleUrl = new URL(
+        (globalThis.fetch as jest.Mock).mock.calls[0][0] as string
+      );
+      expect(appleUrl.searchParams.get('term')).toBe('Duran Duran');
+      expect(appleUrl.searchParams.get('attribute')).toBe('artistTerm');
+      expect(appleUrl.searchParams.get('limit')).toBe('200');
     });
 
     it('rejects empty, malformed, and oversized track lists', async () => {
