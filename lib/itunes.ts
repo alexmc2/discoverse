@@ -145,10 +145,17 @@ export function matchITunesTracks(
     }
 
     // Prefer a result no earlier track has already taken, so a title and its
-    // remaster/edit don't both collapse onto the same Apple recording. Fall
-    // back to the claimed one when there is no alternative, which keeps
-    // genuinely repeated titles working.
-    const chosen = bestUnclaimed ?? best;
+    // remaster/edit don't both collapse onto the same Apple recording.
+    //
+    // Only steal an unclaimed result when it scores as well as the best match.
+    // Dropping to a strictly worse one would demote an exact title match to a
+    // mere edition match — and when two requested tracks share a title they are
+    // the same song, so they should keep the same recording rather than be
+    // split across a studio and a live take.
+    const chosen =
+      bestUnclaimed && best && bestUnclaimed.score === best.score
+        ? bestUnclaimed
+        : best;
     if (chosen) claimed.add(chosen.result);
 
     return {

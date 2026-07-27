@@ -137,6 +137,39 @@ describe('matchITunesTracks duplicate handling', () => {
     expect(matches[1].previewUrl).not.toBe(matches[0].previewUrl);
   });
 
+  // Distinguishes "prefer any unclaimed result" from "prefer an unclaimed
+  // result only when it scores equally". Spotify can return the same title
+  // twice from different albums; those are the same song and must keep the same
+  // recording rather than be split onto a studio and a live take.
+  it('keeps identically titled tracks on the same recording rather than downgrading one', () => {
+    const results = [
+      {
+        artistName: 'Duran Duran',
+        trackName: 'Ordinary World',
+        previewUrl: 'https://audio.example/studio.m4a',
+      },
+      {
+        artistName: 'Duran Duran',
+        trackName: 'Ordinary World (Live)',
+        previewUrl: 'https://audio.example/live.m4a',
+      },
+    ];
+
+    const matches = matchITunesTracks(
+      'Duran Duran',
+      [
+        { name: 'Ordinary World', artist: 'Duran Duran' },
+        { name: 'Ordinary World', artist: 'Duran Duran' },
+      ],
+      results
+    );
+
+    // Both exactly match the studio recording; neither should be demoted to the
+    // live take just to avoid reusing a result.
+    expect(matches[0].previewUrl).toBe('https://audio.example/studio.m4a');
+    expect(matches[1].previewUrl).toBe('https://audio.example/studio.m4a');
+  });
+
   it('still matches when the same title is genuinely requested twice', () => {
     const results = [
       {

@@ -15,8 +15,19 @@ function arg(name, fallback) {
 }
 
 const BASE = arg('base', 'https://discoverse.co.uk').replace(/\/$/, '');
-const SAMPLE = Math.max(1, Number(arg('sample', '12')));
-const THRESHOLD = Number(arg('threshold', '0.9'));
+
+// Fall back to the defaults on unparseable input. A NaN threshold would make
+// `ratio < THRESHOLD` false for every value, so the check would report OK no
+// matter how many previews were dead — the exact silent-pass this script exists
+// to prevent.
+const sampleRaw = Number(arg('sample', '12'));
+const thresholdRaw = Number(arg('threshold', '0.9'));
+const SAMPLE = Number.isFinite(sampleRaw) ? Math.max(1, Math.round(sampleRaw)) : 12;
+const THRESHOLD = Number.isFinite(thresholdRaw)
+  ? Math.min(1, Math.max(0, thresholdRaw))
+  : 0.9;
+
+const REQUEST_TIMEOUT_MS = 10_000;
 
 // A spread of seeded artists plus a few that exercise awkward name handling.
 const CANDIDATES = [
@@ -26,9 +37,13 @@ const CANDIDATES = [
   'Crosby, Stills & Nash', 'LCD Soundsystem',
 ];
 
+// Bounded so one hung Apple CDN connection cannot stall the scheduled job.
 async function headOk(url) {
   try {
-    const res = await fetch(url, { headers: { Range: 'bytes=0-1023' } });
+    const res = await fetch(url, {
+      headers: { Range: 'bytes=0-1023' },
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    });
     return res.status === 200 || res.status === 206;
   } catch {
     return false;
@@ -44,7 +59,10 @@ for (const artist of CANDIDATES.slice(0, SAMPLE)) {
   const url = `${BASE}/api/search-cache?artist=${encodeURIComponent(artist)}&type=panel`;
   let data = null;
   try {
-    const res = await fetch(url);
+    // Same bound as headOk — a hung cache read would stall the job just as badly.
+    const res = await fetch(url, {
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    });
     ({ data } = await res.json());
   } catch (err) {
     failures.push(`${artist}: cache request failed (${err.message})`);
