@@ -270,6 +270,87 @@ describe('fetchPanelDataClient', () => {
     globalThis.fetch = originalFetch;
   });
 
+  // A fully-populated cached panel is normally returned untouched. Once it is
+  // old enough its Apple URLs may have rotted, so it must be re-resolved and
+  // rewritten rather than trusted until the entry expires.
+  it('re-resolves and rewrites a complete but stale cached panel', async () => {
+    const cachedTracks = [
+      makeTrack('Ordinary World', 'https://audio.example/old-ordinary.m4a'),
+      makeTrack('Come Undone', 'https://audio.example/old-come-undone.m4a'),
+    ];
+    const refreshedTracks = [
+      makeTrack('Ordinary World', 'https://audio.example/new-ordinary.m4a'),
+      makeTrack('Come Undone', 'https://audio.example/new-come-undone.m4a'),
+    ];
+    (globalThis.fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          data: {
+            artist: {
+              name: 'Duran Duran',
+              url: 'https://last.fm/music/Duran+Duran',
+              image: 'https://images.example/duran.jpg',
+              listeners: 1,
+              playcount: 2,
+              tags: ['new wave'],
+            },
+            tracks: cachedTracks,
+            trackSource: 'spotify',
+          },
+          // 90 days old, past the 30-day refresh window
+          cachedAt: Date.now() - 90 * 24 * 60 * 60 * 1000,
+        }),
+    });
+    mockEnrichTracksWithITunesPreviews.mockResolvedValue({
+      tracks: refreshedTracks,
+      lookupSucceeded: true,
+    });
+
+    const result = await fetchPanelDataClient('Duran Duran');
+
+    expect(mockEnrichTracksWithITunesPreviews).toHaveBeenCalledWith(
+      'Duran Duran',
+      cachedTracks,
+      undefined,
+      { refreshExisting: true }
+    );
+    expect(result.data.tracks).toEqual(refreshedTracks);
+    expect(result.shouldCache).toBe(true);
+  });
+
+  it('returns a complete and fresh cached panel without re-resolving it', async () => {
+    const cachedTracks = [
+      makeTrack('Ordinary World', 'https://audio.example/ordinary.m4a'),
+      makeTrack('Come Undone', 'https://audio.example/come-undone.m4a'),
+    ];
+    (globalThis.fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          data: {
+            artist: {
+              name: 'Duran Duran',
+              url: 'https://last.fm/music/Duran+Duran',
+              image: 'https://images.example/duran.jpg',
+              listeners: 1,
+              playcount: 2,
+              tags: ['new wave'],
+            },
+            tracks: cachedTracks,
+            trackSource: 'spotify',
+          },
+          cachedAt: Date.now() - 1000,
+        }),
+    });
+
+    const result = await fetchPanelDataClient('Duran Duran');
+
+    expect(mockEnrichTracksWithITunesPreviews).not.toHaveBeenCalled();
+    expect(result.shouldCache).toBe(false);
+    expect(result.data.tracks).toEqual(cachedTracks);
+  });
+
   it('upgrades a partial shared cache and falls back to the graph image', async () => {
     const cachedTracks = [
       makeTrack('Ordinary World', 'https://audio.example/ordinary.m4a'),
@@ -316,7 +397,9 @@ describe('fetchPanelDataClient', () => {
     );
     expect(mockEnrichTracksWithITunesPreviews).toHaveBeenCalledWith(
       'Duran Duran',
-      cachedTracks
+      cachedTracks,
+      undefined,
+      { refreshExisting: false }
     );
     expect(mockGetArtistInfo).not.toHaveBeenCalled();
   });
@@ -440,6 +523,101 @@ describe('fetchPanelDataClient', () => {
     expect(result.data.tracks[0].preview_url).toBe(
       'https://audio.example/reflex.m4a'
     );
+  });
+
+  // Regression guard for the cache death spiral: when Apple throttles a lookup
+  // it still returns matches for some tracks, and those must be persisted.
+  // Requiring lookupSucceeded meant one throttled response left the artist
+  // uncached forever, so every later visitor re-triggered the same failing call.
+  it('caches a partially enriched panel even when the iTunes lookup fails', async () => {
+    (globalThis.fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ data: null }),
+    });
+    mockGetArtistInfo.mockResolvedValue({
+      name: 'Duran Duran',
+      url: 'https://last.fm/music/Duran+Duran',
+      image: placeholderImage,
+      listeners: 1,
+      playcount: 2,
+      tags: ['new wave'],
+    });
+    mockGetArtistImage.mockResolvedValue(undefined);
+    mockGetArtistSpotifyUrl.mockResolvedValue(undefined);
+    mockGetArtistTopTracksWithPreviews.mockResolvedValue({
+      tracks: [],
+      previewLookupSucceeded: false,
+    });
+    mockGetLastFmTopTracks.mockResolvedValue([
+      {
+        name: 'The Reflex',
+        artist: 'Duran Duran',
+        playcount: 1,
+        url: 'https://last.fm/track/The+Reflex',
+      },
+      {
+        name: 'Rio',
+        artist: 'Duran Duran',
+        playcount: 2,
+        url: 'https://last.fm/track/Rio',
+      },
+    ]);
+    mockEnrichTracksWithITunesPreviews.mockImplementation(
+      async (_artistName: string, tracks: Array<{ name: string }>) => ({
+        tracks: tracks.map((track, index) => ({
+          ...track,
+          preview_url:
+            index === 0 ? 'https://audio.example/reflex.m4a' : null,
+        })),
+        lookupSucceeded: false,
+      })
+    );
+
+    const result = await fetchPanelDataClient('Duran Duran');
+
+    expect(result.shouldCache).toBe(true);
+    expect(result.data.tracks[0].preview_url).toBe(
+      'https://audio.example/reflex.m4a'
+    );
+  });
+
+  it('does not cache a panel with no playable previews at all', async () => {
+    (globalThis.fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ data: null }),
+    });
+    mockGetArtistInfo.mockResolvedValue({
+      name: 'Duran Duran',
+      url: 'https://last.fm/music/Duran+Duran',
+      image: placeholderImage,
+      listeners: 1,
+      playcount: 2,
+      tags: ['new wave'],
+    });
+    mockGetArtistImage.mockResolvedValue(undefined);
+    mockGetArtistSpotifyUrl.mockResolvedValue(undefined);
+    mockGetArtistTopTracksWithPreviews.mockResolvedValue({
+      tracks: [],
+      previewLookupSucceeded: false,
+    });
+    mockGetLastFmTopTracks.mockResolvedValue([
+      {
+        name: 'The Reflex',
+        artist: 'Duran Duran',
+        playcount: 1,
+        url: 'https://last.fm/track/The+Reflex',
+      },
+    ]);
+    mockEnrichTracksWithITunesPreviews.mockImplementation(
+      async (_artistName: string, tracks: Array<{ name: string }>) => ({
+        tracks: tracks.map((track) => ({ ...track, preview_url: null })),
+        lookupSucceeded: false,
+      })
+    );
+
+    const result = await fetchPanelDataClient('Duran Duran');
+
+    expect(result.shouldCache).toBe(false);
   });
 });
 

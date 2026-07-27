@@ -253,6 +253,21 @@ export async function getDefaultArtistPanelData(
   return cached?.panelData ?? null;
 }
 
+/**
+ * When the default-artist entry was last refreshed, as epoch millis, or null if
+ * unknown. Lets the client apply the same staleness check to seeded artists as
+ * to search-cache entries — these are typically the OLDEST preview URLs in the
+ * system, so exempting them from refresh would be backwards.
+ */
+export async function getDefaultArtistPanelCachedAt(
+  artistName: string
+): Promise<number | null> {
+  const cached = await getDefaultArtistEntry(artistName);
+  if (!cached?.lastUpdated) return null;
+  const parsed = Date.parse(cached.lastUpdated);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
 export async function getSearchCacheBootstrap(artistName: string): Promise<{
   graphData: GraphData;
   panelData: {

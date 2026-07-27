@@ -50,6 +50,12 @@ interface ArtistPanelProps {
   tracksLoading?: boolean;
   onClose: () => void;
   onExpand?: (artist: string) => void;
+  /**
+   * Fired when a preview URL fails to load or play. Lets the app re-resolve and
+   * repair the shared cache, so a rotted URL is fixed by the first person who
+   * hits it rather than persisting for everyone until the entry expires.
+   */
+  onPreviewFailed?: (track: TrackData) => void;
 }
 
 export default function ArtistPanel({
@@ -60,6 +66,7 @@ export default function ArtistPanel({
   tracksLoading,
   onClose,
   onExpand,
+  onPreviewFailed,
 }: ArtistPanelProps) {
   const isWorkersDev =
     typeof window !== 'undefined' && /\.workers\.dev$/i.test(window.location.hostname);
@@ -157,6 +164,7 @@ export default function ArtistPanel({
         if (sessionRef.current !== mySession) return;
         setIsPlaying(false);
         setPlayingTrackId(null);
+        onPreviewFailed?.(track);
       };
 
       setPlayingTrackId(track.id);

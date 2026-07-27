@@ -189,22 +189,66 @@ function noteFailure() {
   }
 }
 
+const MAX_SPOTIFY_ATTEMPTS = 3;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+// 429 and 5xx are transient; every other non-ok status (bad id, bad token,
+// unknown market) will fail identically on retry.
+function isRetryableStatus(status: number): boolean {
+  return status === 429 || status >= 500;
+}
+
+function backoffMs(attempt: number): number {
+  return Math.min(250 * 2 ** attempt, 4_000) + Math.random() * 250;
+}
+
+function retryDelayMs(res: Response, attempt: number): number {
+  const retryAfter = Number(res.headers.get('retry-after'));
+  if (Number.isFinite(retryAfter) && retryAfter > 0) {
+    return Math.min(retryAfter * 1000, 8_000);
+  }
+  return backoffMs(attempt);
+}
+
 async function spotifyGET<T>(url: string, token: string): Promise<T | null> {
   if (inCooloff()) return null;
 
-  try {
-    const res = await withLimit(() =>
-      fetch(url, { headers: { Authorization: `Bearer ${token}` } })
-    );
-    if (!res.ok) return null;
+  for (let attempt = 0; attempt < MAX_SPOTIFY_ATTEMPTS; attempt++) {
+    const isLastAttempt = attempt === MAX_SPOTIFY_ATTEMPTS - 1;
+    try {
+      const res = await withLimit(() =>
+        fetch(url, { headers: { Authorization: `Bearer ${token}` } })
+      );
 
-    consecutiveFailures = 0; // success resets breaker
-    return (await res.json()) as T;
-  } catch {
-    // Miniflare often throws "Network connection lost" here
-    noteFailure();
-    return null;
+      if (res.ok) {
+        consecutiveFailures = 0; // success resets breaker
+        return (await res.json()) as T;
+      }
+
+      if (!isRetryableStatus(res.status)) return null;
+
+      // Callers cannot distinguish "no such artist" from "try again", so a
+      // single transient 429/5xx used to drop the entire panel to the Last.fm
+      // fallback. Retry before giving up.
+      if (isLastAttempt) {
+        noteFailure();
+        return null;
+      }
+      await sleep(retryDelayMs(res, attempt));
+    } catch {
+      // Miniflare often throws "Network connection lost" here
+      if (isLastAttempt) {
+        noteFailure();
+        return null;
+      }
+      await sleep(backoffMs(attempt));
+    }
   }
+
+  return null;
 }
 
 /** ====== Market detection ====== */
@@ -357,17 +401,28 @@ async function lookupITunesTracksClient(
   }
 }
 
+export interface ITunesEnrichmentOptions {
+  /**
+   * Re-resolve preview URLs that are already present rather than only filling
+   * in missing ones. Used to refresh cached panels whose Apple URLs have had
+   * time to go stale.
+   */
+  refreshExisting?: boolean;
+}
+
 export async function enrichTracksWithITunesPreviews<
   T extends PreviewableTrack,
 >(
   artistName: string,
   tracks: T[],
-  marketHint?: string
+  marketHint?: string,
+  options: ITunesEnrichmentOptions = {}
 ): Promise<ITunesEnrichmentResult<T>> {
   const nextTracks = tracks.map(clonePreviewableTrack);
   if (
     nextTracks.length === 0 ||
-    nextTracks.every((track) => !!track.preview_url)
+    (!options.refreshExisting &&
+      nextTracks.every((track) => !!track.preview_url))
   ) {
     return { tracks: nextTracks, lookupSucceeded: true };
   }
@@ -376,16 +431,23 @@ export async function enrichTracksWithITunesPreviews<
     marketHint?.trim() || detectMarketPriority()[0] || 'GB'
   ).toUpperCase();
 
-  const lookup = isServer()
-    ? await lookupITunesTracks(
-        artistName,
-        nextTracks.map((track) => ({
-          name: track.name,
-          artist: track.artists[0]?.name,
-        })),
-        country
-      )
-    : await lookupITunesTracksClient(artistName, nextTracks, country);
+  const requests = nextTracks.map((track) => ({
+    name: track.name,
+    artist: track.artists[0]?.name,
+  }));
+
+  // Call Apple directly, from the browser as well as the server. iTunes Search
+  // sends CORS headers, and going direct puts each lookup on the end user's own
+  // IP. Routing every user through /api/itunes-preview instead funnels the whole
+  // site through the Worker's handful of egress IPs, which Apple rate-limits
+  // hard (observed: 12 of 12 deployed requests returning 429/502).
+  let lookup = await lookupITunesTracks(artistName, requests, country);
+
+  // Keep the proxy as a fallback for clients where the direct call is blocked
+  // (extensions, corporate DNS, or a future Apple CORS change).
+  if (!lookup.lookupSucceeded && !isServer()) {
+    lookup = await lookupITunesTracksClient(artistName, nextTracks, country);
+  }
 
   if (!lookup.lookupSucceeded) {
     return { tracks: nextTracks, lookupSucceeded: false };
@@ -395,7 +457,7 @@ export async function enrichTracksWithITunesPreviews<
     const match = lookup.matches[index];
     if (!match) continue;
 
-    if (!track.preview_url && match.previewUrl) {
+    if ((!track.preview_url || options.refreshExisting) && match.previewUrl) {
       track.preview_url = match.previewUrl;
     }
     if ((!track.duration_ms || track.duration_ms <= 0) && match.durationMs) {
@@ -432,14 +494,34 @@ export async function getArtistTopTracksWithPreviews(
   const artist = await searchSpotifyArtist(artistName);
   if (!artist) return { tracks: [], previewLookupSucceeded: false };
 
-  const market = (marketHint?.trim() || detectMarketPriority()[0] || 'GB')
-    .toUpperCase();
-  const url = `https://api.spotify.com/v1/artists/${artist.id}/top-tracks?market=${market}`;
-  const data = await spotifyGET<SpotifyTopTracksResponse>(url, token);
-  const tracks = data?.tracks?.slice(0, 10) ?? [];
+  // Try each market in turn. An artist with no catalogue in the viewer's own
+  // storefront returns an empty track list rather than an error, and dropping
+  // out here sends the whole panel to the Last.fm fallback.
+  const hinted = marketHint?.trim().toUpperCase();
+  const marketOrder = hinted
+    ? [hinted, ...detectMarketPriority().filter((m) => m !== hinted)]
+    : detectMarketPriority();
+
+  let tracks: SpotifyTrack[] = [];
+  let market = marketOrder[0] ?? 'GB';
+  for (const candidate of marketOrder) {
+    const url = `https://api.spotify.com/v1/artists/${artist.id}/top-tracks?market=${candidate}`;
+    const data = await spotifyGET<SpotifyTopTracksResponse>(url, token);
+    if (data?.tracks?.length) {
+      tracks = data.tracks.slice(0, 10);
+      market = candidate;
+      break;
+    }
+  }
+
   if (!tracks.length) {
     return { tracks: [], previewLookupSucceeded: false };
   }
+
+  // Note: the pre-PR#17 code also re-queried every market hunting for a
+  // non-null preview_url. Spotify now returns null for preview_url on every
+  // endpoint and every market, so that loop is pure latency. iTunes below is
+  // the only preview source.
 
   const enriched = await enrichTracksWithITunesPreviews(
     artistName,
