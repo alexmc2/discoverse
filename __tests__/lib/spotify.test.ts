@@ -284,5 +284,191 @@ describe('spotify module', () => {
 
       expect(result).toEqual([]);
     });
+
+    it('uses one batch preview lookup when Spotify tracks lack previews', async () => {
+      const mockArtist = {
+        id: 'abc123',
+        name: 'Radiohead',
+        images: [],
+        genres: [],
+        popularity: 80,
+      };
+      const mockTracks = [
+        {
+          id: 'track1',
+          name: 'Creep',
+          preview_url: null,
+          duration_ms: 240000,
+          popularity: 75,
+          album: { name: 'Pablo Honey', images: [] },
+          artists: [{ name: 'Radiohead' }],
+        },
+        {
+          id: 'track2',
+          name: 'Karma Police',
+          preview_url: null,
+          duration_ms: 0,
+          popularity: 70,
+          album: { name: '—', images: [] },
+          artists: [{ name: 'Radiohead' }],
+        },
+      ];
+
+      (globalThis.fetch as jest.Mock)
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              access_token: 'tok',
+              token_type: 'Bearer',
+              expires_in: 3600,
+            }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () =>
+            Promise.resolve({ artists: { items: [mockArtist] } }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve({ tracks: mockTracks }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              lookupSucceeded: true,
+              matches: [
+                {
+                  previewUrl: 'https://audio.example/creep.m4a',
+                },
+                {
+                  previewUrl: 'https://audio.example/karma.m4a',
+                  albumName: 'OK Computer',
+                  durationMs: 264000,
+                },
+              ],
+            }),
+        });
+
+      const { getArtistTopTracksWithPreviews } = await import(
+        '@/lib/spotify'
+      );
+      const result = await getArtistTopTracksWithPreviews(
+        'Radiohead',
+        'GB'
+      );
+
+      expect(result.previewLookupSucceeded).toBe(true);
+      expect(result.tracks.map((track) => track.preview_url)).toEqual([
+        'https://audio.example/creep.m4a',
+        'https://audio.example/karma.m4a',
+      ]);
+      expect(result.tracks[1].album.name).toBe('OK Computer');
+      expect(result.tracks[1].duration_ms).toBe(264000);
+
+      const calls = (globalThis.fetch as jest.Mock).mock.calls;
+      expect(calls).toHaveLength(4);
+      expect(
+        calls.filter(([url]) =>
+          String(url).includes('/top-tracks?market=')
+        )
+      ).toHaveLength(1);
+      expect(calls[3][0]).toBe('/api/itunes-preview');
+      expect(calls[3][1]).toMatchObject({
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      expect(JSON.parse(calls[3][1].body)).toMatchObject({
+        artist: 'Radiohead',
+        country: 'GB',
+        tracks: [
+          { name: 'Creep', artist: 'Radiohead' },
+          { name: 'Karma Police', artist: 'Radiohead' },
+        ],
+      });
+    });
+
+    it('preserves Spotify data when the batch preview lookup fails', async () => {
+      const originalTracks = [
+        {
+          id: 'track1',
+          name: 'Creep',
+          preview_url: 'https://audio.example/native.m4a',
+          duration_ms: 240000,
+          popularity: 75,
+          album: { name: 'Pablo Honey', images: [] },
+          artists: [{ name: 'Radiohead' }],
+        },
+        {
+          id: 'track2',
+          name: 'Karma Police',
+          preview_url: null,
+          duration_ms: 264000,
+          popularity: 70,
+          album: { name: 'OK Computer', images: [] },
+          artists: [{ name: 'Radiohead' }],
+        },
+      ];
+      (globalThis.fetch as jest.Mock).mockResolvedValue({
+        ok: false,
+        status: 429,
+      });
+
+      const { enrichTracksWithITunesPreviews } = await import(
+        '@/lib/spotify'
+      );
+      const result = await enrichTracksWithITunesPreviews(
+        'Radiohead',
+        originalTracks,
+        'GB'
+      );
+
+      expect(result.lookupSucceeded).toBe(false);
+      expect(result.tracks).toEqual(originalTracks);
+      expect(result.tracks).not.toBe(originalTracks);
+      expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+    });
+
+    it('returns no Spotify tracks when the top-tracks endpoint is unavailable', async () => {
+      const mockArtist = {
+        id: 'abc123',
+        name: 'Radiohead',
+        images: [],
+        genres: [],
+        popularity: 80,
+      };
+
+      (globalThis.fetch as jest.Mock)
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              access_token: 'tok',
+              token_type: 'Bearer',
+              expires_in: 3600,
+            }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () =>
+            Promise.resolve({ artists: { items: [mockArtist] } }),
+        })
+        .mockResolvedValueOnce({
+          ok: false,
+          status: 403,
+        });
+
+      const { getArtistTopTracksWithPreviews } = await import(
+        '@/lib/spotify'
+      );
+      const result = await getArtistTopTracksWithPreviews('Radiohead');
+
+      expect(result).toEqual({
+        tracks: [],
+        previewLookupSucceeded: false,
+      });
+      expect(globalThis.fetch).toHaveBeenCalledTimes(3);
+    });
   });
 });

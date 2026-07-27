@@ -2,6 +2,11 @@
 // Spotify Web API integration + robust previews with iTunes fallback.
 // Safe for both client AND server environments (Node + CF Workers).
 
+import {
+  lookupITunesTracks,
+  type ITunesTrackMatch,
+} from './itunes';
+
 /** ====== Spotify types ====== */
 interface SpotifyArtistImage {
   url: string;
@@ -280,130 +285,180 @@ export async function getArtistImages(
 }
 
 /** ====== iTunes fallback for previews ====== */
-interface ITunesResult {
-  artistName: string;
-  trackName: string;
-  previewUrl?: string;
-}
-interface ITunesSearchResponse {
-  resultCount: number;
-  results: ITunesResult[];
-}
+type PreviewableTrack = {
+  name: string;
+  preview_url: string | null;
+  duration_ms?: number;
+  artists: Array<{ name: string }>;
+  album?: {
+    name: string;
+    images: Array<{ url: string }>;
+  };
+};
 
-async function fetchITunesPreview(
-  artist: string,
-  track: string
-): Promise<string | null> {
-  try {
-    if (isServer()) {
-      // Server-side: call iTunes directly (no CORS issue)
-      const url = `https://itunes.apple.com/search?term=${encodeURIComponent(
-        `${artist} ${track}`
-      )}&media=music&entity=song&limit=5`;
-      const res = await withLimit(() => fetch(url));
-      if (!res.ok) return null;
-      const data: ITunesSearchResponse = await res.json();
-
-      if (!data.results || data.resultCount === 0) return null;
-
-      const lowerArtist = artist.toLowerCase();
-      const lowerTrack = track.toLowerCase();
-
-      const exact = data.results.find((r) => {
-        const a = (r.artistName || '').toLowerCase();
-        const t = (r.trackName || '').toLowerCase();
-        return a.includes(lowerArtist) && t === lowerTrack && !!r.previewUrl;
-      });
-
-      const candidate =
-        exact ?? data.results.find((r) => !!r.previewUrl) ?? null;
-      return candidate?.previewUrl ?? null;
-    } else {
-      // Client-side: use proxy to avoid CORS 403
-      const url = `/api/itunes-preview?artist=${encodeURIComponent(artist)}&track=${encodeURIComponent(track)}`;
-      const res = await withLimit(() => fetch(url));
-      if (!res.ok) return null;
-      const data = await res.json();
-      return data.previewUrl ?? null;
-    }
-  } catch {
-    return null;
-  }
+export interface ITunesEnrichmentResult<T> {
+  tracks: T[];
+  lookupSucceeded: boolean;
 }
 
-async function enrichWithITunesPreviews(
+interface ClientITunesLookupResponse {
+  matches?: ITunesTrackMatch[];
+  lookupSucceeded?: boolean;
+}
+
+function clonePreviewableTrack<T extends PreviewableTrack>(track: T): T {
+  return {
+    ...track,
+    artists: track.artists.map((artist) => ({ ...artist })),
+    album: track.album
+      ? {
+          ...track.album,
+          images: track.album.images.map((image) => ({ ...image })),
+        }
+      : track.album,
+  };
+}
+
+async function lookupITunesTracksClient(
   artistName: string,
-  tracks: SpotifyTrack[]
-): Promise<void> {
-  const concurrency = 3;
-  let index = 0;
+  tracks: PreviewableTrack[],
+  country: string
+): Promise<{
+  matches: ITunesTrackMatch[];
+  lookupSucceeded: boolean;
+}> {
+  try {
+    const response = await withLimit(() =>
+      fetch('/api/itunes-preview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          artist: artistName,
+          country,
+          tracks: tracks.map((track) => ({
+            name: track.name,
+            artist: track.artists[0]?.name,
+          })),
+        }),
+      })
+    );
 
-  async function worker(): Promise<void> {
-    while (index < tracks.length) {
-      const current = index++;
-      const t = tracks[current];
-      if (t.preview_url) continue;
+    if (!response.ok) {
+      return { matches: [], lookupSucceeded: false };
+    }
 
-      const candidate = await fetchITunesPreview(
-        t.artists[0]?.name ?? artistName,
-        t.name
-      );
-      if (candidate) t.preview_url = candidate;
+    const data = (await response.json()) as ClientITunesLookupResponse;
+    return {
+      matches: Array.isArray(data.matches) ? data.matches : [],
+      lookupSucceeded: data.lookupSucceeded === true,
+    };
+  } catch {
+    return { matches: [], lookupSucceeded: false };
+  }
+}
+
+export async function enrichTracksWithITunesPreviews<
+  T extends PreviewableTrack,
+>(
+  artistName: string,
+  tracks: T[],
+  marketHint?: string
+): Promise<ITunesEnrichmentResult<T>> {
+  const nextTracks = tracks.map(clonePreviewableTrack);
+  if (
+    nextTracks.length === 0 ||
+    nextTracks.every((track) => !!track.preview_url)
+  ) {
+    return { tracks: nextTracks, lookupSucceeded: true };
+  }
+
+  const country = (
+    marketHint?.trim() || detectMarketPriority()[0] || 'GB'
+  ).toUpperCase();
+
+  const lookup = isServer()
+    ? await lookupITunesTracks(
+        artistName,
+        nextTracks.map((track) => ({
+          name: track.name,
+          artist: track.artists[0]?.name,
+        })),
+        country
+      )
+    : await lookupITunesTracksClient(artistName, nextTracks, country);
+
+  if (!lookup.lookupSucceeded) {
+    return { tracks: nextTracks, lookupSucceeded: false };
+  }
+
+  for (const [index, track] of nextTracks.entries()) {
+    const match = lookup.matches[index];
+    if (!match) continue;
+
+    if (!track.preview_url && match.previewUrl) {
+      track.preview_url = match.previewUrl;
+    }
+    if ((!track.duration_ms || track.duration_ms <= 0) && match.durationMs) {
+      track.duration_ms = match.durationMs;
+    }
+    if (
+      track.album &&
+      (!track.album.name || track.album.name === '—') &&
+      match.albumName
+    ) {
+      track.album.name = match.albumName;
     }
   }
 
-  await Promise.all(Array.from({ length: concurrency }).map(() => worker()));
+  return { tracks: nextTracks, lookupSucceeded: true };
 }
 
 /** ====== Public: top tracks with robust previews ====== */
+export interface ArtistTopTracksResult {
+  tracks: SpotifyTrack[];
+  previewLookupSucceeded: boolean;
+}
+
+export async function getArtistTopTracksWithPreviews(
+  artistName: string,
+  marketHint?: string
+): Promise<ArtistTopTracksResult> {
+  if (isServer() && FORCE_CLIENT) {
+    return { tracks: [], previewLookupSucceeded: false };
+  }
+  const token = await getSpotifyToken();
+  if (!token) return { tracks: [], previewLookupSucceeded: false };
+
+  const artist = await searchSpotifyArtist(artistName);
+  if (!artist) return { tracks: [], previewLookupSucceeded: false };
+
+  const market = (marketHint?.trim() || detectMarketPriority()[0] || 'GB')
+    .toUpperCase();
+  const url = `https://api.spotify.com/v1/artists/${artist.id}/top-tracks?market=${market}`;
+  const data = await spotifyGET<SpotifyTopTracksResponse>(url, token);
+  const tracks = data?.tracks?.slice(0, 10) ?? [];
+  if (!tracks.length) {
+    return { tracks: [], previewLookupSucceeded: false };
+  }
+
+  const enriched = await enrichTracksWithITunesPreviews(
+    artistName,
+    tracks,
+    market
+  );
+  return {
+    tracks: enriched.tracks.slice(0, 10),
+    previewLookupSucceeded: enriched.lookupSucceeded,
+  };
+}
+
 export async function getArtistTopTracks(
   artistName: string,
   marketHint?: string
 ): Promise<SpotifyTrack[]> {
-  if (isServer() && FORCE_CLIENT) return [];
-  const token = await getSpotifyToken();
-  if (!token) return [];
-
-  const artist = await searchSpotifyArtist(artistName);
-  if (!artist) return [];
-
-  const marketOrder = marketHint
-    ? [marketHint, ...detectMarketPriority().filter((m) => m !== marketHint)]
-    : detectMarketPriority();
-
-  let tracks: SpotifyTrack[] = [];
-  for (const market of marketOrder) {
-    const url = `https://api.spotify.com/v1/artists/${artist.id}/top-tracks?market=${market}`;
-    const data = await spotifyGET<SpotifyTopTracksResponse>(url, token);
-    if (data?.tracks?.length) {
-      tracks = data.tracks.slice(0, 10);
-      break;
-    }
-  }
-  if (!tracks.length) return [];
-
-  // Try alternate markets for previews if needed
-  const hasAnyPreview = tracks.some((t) => !!t.preview_url);
-  if (!hasAnyPreview) {
-    for (const market of marketOrder) {
-      const url = `https://api.spotify.com/v1/artists/${artist.id}/top-tracks?market=${market}`;
-      const data = await spotifyGET<SpotifyTopTracksResponse>(url, token);
-      if (!data?.tracks?.length) continue;
-      for (const t of tracks) {
-        if (!t.preview_url) {
-          const alt = data.tracks.find(
-            (x) => x.name.toLowerCase() === t.name.toLowerCase()
-          );
-          if (alt?.preview_url) t.preview_url = alt.preview_url;
-        }
-      }
-      if (tracks.some((t) => !!t.preview_url)) break;
-    }
-  }
-
-  if (tracks.some((t) => !t.preview_url)) {
-    await enrichWithITunesPreviews(artistName, tracks);
-  }
-
-  return tracks.slice(0, 10);
+  const result = await getArtistTopTracksWithPreviews(
+    artistName,
+    marketHint
+  );
+  return result.tracks;
 }

@@ -1,9 +1,9 @@
 /**
  * @jest-environment node
  */
-import { GET } from '@/app/api/itunes-preview/route';
+import { GET, POST } from '@/app/api/itunes-preview/route';
 
-describe('GET /api/itunes-preview', () => {
+describe('/api/itunes-preview', () => {
   const originalFetch = globalThis.fetch;
 
   beforeEach(() => {
@@ -15,118 +15,267 @@ describe('GET /api/itunes-preview', () => {
     jest.restoreAllMocks();
   });
 
-  function makeRequest(params: Record<string, string>): Request {
+  function makeGetRequest(params: Record<string, string>): Request {
     const url = new URL('http://localhost:3000/api/itunes-preview');
-    for (const [k, v] of Object.entries(params)) {
-      url.searchParams.set(k, v);
+    for (const [key, value] of Object.entries(params)) {
+      url.searchParams.set(key, value);
     }
     return new Request(url);
   }
 
-  it('returns 400 when artist is missing', async () => {
-    const res = await GET(makeRequest({ track: 'Creep' }));
-    expect(res.status).toBe(400);
+  function makePostRequest(body: unknown): Request {
+    return new Request('http://localhost:3000/api/itunes-preview', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+  }
+
+  describe('GET compatibility endpoint', () => {
+    it('returns 400 when artist or track is missing', async () => {
+      const withoutArtist = await GET(makeGetRequest({ track: 'Creep' }));
+      const withoutTrack = await GET(
+        makeGetRequest({ artist: 'Radiohead' })
+      );
+
+      expect(withoutArtist.status).toBe(400);
+      expect(withoutTrack.status).toBe(400);
+    });
+
+    it('returns the exact artist and track preview', async () => {
+      (globalThis.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: () =>
+          Promise.resolve({
+            resultCount: 2,
+            results: [
+              {
+                artistName: 'Radiohead',
+                trackName: 'Creep',
+                previewUrl: 'https://audio.example/creep.m4a',
+              },
+              {
+                artistName: 'Radiohead',
+                trackName: 'Other Song',
+                previewUrl: 'https://audio.example/other.m4a',
+              },
+            ],
+          }),
+      });
+
+      const response = await GET(
+        makeGetRequest({ artist: 'Radiohead', track: 'Creep' })
+      );
+
+      await expect(response.json()).resolves.toEqual({
+        previewUrl: 'https://audio.example/creep.m4a',
+      });
+    });
+
+    it('does not substitute an unrelated artist or track', async () => {
+      (globalThis.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: () =>
+          Promise.resolve({
+            resultCount: 1,
+            results: [
+              {
+                artistName: 'Different Artist',
+                trackName: 'Different Song',
+                previewUrl: 'https://audio.example/wrong.m4a',
+              },
+            ],
+          }),
+      });
+
+      const response = await GET(
+        makeGetRequest({ artist: 'Radiohead', track: 'Creep' })
+      );
+
+      await expect(response.json()).resolves.toEqual({ previewUrl: null });
+    });
+
+    it('uses one artist-wide Apple search with a normalized country', async () => {
+      (globalThis.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({ resultCount: 0, results: [] }),
+      });
+
+      await GET(
+        makeGetRequest({
+          artist: 'Björk',
+          track: 'Army of Me',
+          country: 'us',
+        })
+      );
+
+      const [calledUrl, options] = (
+        globalThis.fetch as jest.Mock
+      ).mock.calls[0] as [string, RequestInit];
+      const url = new URL(calledUrl);
+      expect(url.hostname).toBe('itunes.apple.com');
+      expect(url.searchParams.get('term')).toBe('Björk');
+      expect(url.searchParams.get('attribute')).toBe('artistTerm');
+      expect(url.searchParams.get('entity')).toBe('song');
+      expect(url.searchParams.get('limit')).toBe('200');
+      expect(url.searchParams.get('country')).toBe('US');
+      expect(options.cache).toBe('no-store');
+    });
+
+    it('surfaces upstream failures instead of caching a silent null', async () => {
+      (globalThis.fetch as jest.Mock).mockResolvedValue({
+        ok: false,
+        status: 500,
+      });
+
+      const response = await GET(
+        makeGetRequest({ artist: 'Radiohead', track: 'Creep' })
+      );
+
+      expect(response.status).toBe(502);
+      await expect(response.json()).resolves.toEqual({ previewUrl: null });
+    });
+
+    it('preserves an upstream rate-limit status', async () => {
+      (globalThis.fetch as jest.Mock).mockResolvedValue({
+        ok: false,
+        status: 429,
+      });
+
+      const response = await GET(
+        makeGetRequest({ artist: 'Radiohead', track: 'Creep' })
+      );
+
+      expect(response.status).toBe(429);
+    });
+
+    it('returns 502 when the Apple request throws', async () => {
+      (globalThis.fetch as jest.Mock).mockRejectedValue(
+        new Error('Network error')
+      );
+
+      const response = await GET(
+        makeGetRequest({ artist: 'Radiohead', track: 'Creep' })
+      );
+
+      expect(response.status).toBe(502);
+      await expect(response.json()).resolves.toEqual({ previewUrl: null });
+    });
   });
 
-  it('returns 400 when track is missing', async () => {
-    const res = await GET(makeRequest({ artist: 'Radiohead' }));
-    expect(res.status).toBe(400);
-  });
+  describe('POST batch endpoint', () => {
+    it('matches a track list with one Apple request and preserves order', async () => {
+      (globalThis.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: () =>
+          Promise.resolve({
+            resultCount: 3,
+            results: [
+              {
+                artistName: 'Duran Duran',
+                trackName: 'Come Undone',
+                previewUrl: 'https://audio.example/come-undone.m4a',
+                collectionName: 'Duran Duran',
+                trackTimeMillis: 256000,
+              },
+              {
+                artistName: 'Duran Duran',
+                trackName: 'Hungry Like the Wolf (2009 Remaster)',
+                previewUrl: 'https://audio.example/hungry.m4a',
+                collectionName: "Rio (Collector's Edition)",
+                trackTimeMillis: 220000,
+              },
+              {
+                artistName: 'Unrelated Band',
+                trackName: 'Ordinary World',
+                previewUrl: 'https://audio.example/wrong.m4a',
+              },
+            ],
+          }),
+      });
 
-  it('returns preview URL for exact match', async () => {
-    (globalThis.fetch as jest.Mock).mockResolvedValue({
-      ok: true,
-      json: () =>
-        Promise.resolve({
-          resultCount: 2,
-          results: [
+      const response = await POST(
+        makePostRequest({
+          artist: 'Duran Duran',
+          country: 'gb',
+          tracks: [
+            { name: 'Ordinary World', artist: 'Duran Duran' },
+            { name: 'Come Undone', artist: 'Duran Duran' },
             {
-              artistName: 'Radiohead',
-              trackName: 'Creep',
-              previewUrl: 'http://preview.mp3',
-            },
-            {
-              artistName: 'Radiohead',
-              trackName: 'Other Song',
-              previewUrl: 'http://other.mp3',
+              name: 'Hungry Like the Wolf - 2009 Remaster',
+              artist: 'Duran Duran',
             },
           ],
-        }),
+        })
+      );
+
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toEqual({
+        lookupSucceeded: true,
+        matches: [
+          { previewUrl: null },
+          {
+            previewUrl: 'https://audio.example/come-undone.m4a',
+            albumName: 'Duran Duran',
+            durationMs: 256000,
+          },
+          {
+            previewUrl: 'https://audio.example/hungry.m4a',
+            albumName: "Rio (Collector's Edition)",
+            durationMs: 220000,
+          },
+        ],
+      });
+      expect(globalThis.fetch).toHaveBeenCalledTimes(1);
     });
 
-    const res = await GET(makeRequest({ artist: 'Radiohead', track: 'Creep' }));
-    const body = await res.json();
+    it('rejects empty, malformed, and oversized track lists', async () => {
+      const empty = await POST(
+        makePostRequest({ artist: 'Radiohead', tracks: [] })
+      );
+      const malformed = await POST(
+        makePostRequest({
+          artist: 'Radiohead',
+          tracks: [{ name: '' }],
+        })
+      );
+      const oversized = await POST(
+        makePostRequest({
+          artist: 'Radiohead',
+          tracks: Array.from({ length: 11 }, (_, index) => ({
+            name: `Track ${index}`,
+          })),
+        })
+      );
 
-    expect(body.previewUrl).toBe('http://preview.mp3');
-  });
-
-  it('falls back to first result with preview when no exact match', async () => {
-    (globalThis.fetch as jest.Mock).mockResolvedValue({
-      ok: true,
-      json: () =>
-        Promise.resolve({
-          resultCount: 1,
-          results: [
-            {
-              artistName: 'Different Artist',
-              trackName: 'Different Song',
-              previewUrl: 'http://fallback.mp3',
-            },
-          ],
-        }),
+      expect(empty.status).toBe(400);
+      expect(malformed.status).toBe(400);
+      expect(oversized.status).toBe(400);
+      expect(globalThis.fetch).not.toHaveBeenCalled();
     });
 
-    const res = await GET(makeRequest({ artist: 'Radiohead', track: 'Creep' }));
-    const body = await res.json();
+    it('returns 429 and marks the lookup unsuccessful when Apple rate-limits', async () => {
+      (globalThis.fetch as jest.Mock).mockResolvedValue({
+        ok: false,
+        status: 429,
+      });
 
-    expect(body.previewUrl).toBe('http://fallback.mp3');
-  });
+      const response = await POST(
+        makePostRequest({
+          artist: 'Radiohead',
+          tracks: [{ name: 'Creep' }],
+        })
+      );
 
-  it('returns null when no results found', async () => {
-    (globalThis.fetch as jest.Mock).mockResolvedValue({
-      ok: true,
-      json: () =>
-        Promise.resolve({ resultCount: 0, results: [] }),
+      expect(response.status).toBe(429);
+      await expect(response.json()).resolves.toEqual({
+        matches: [{ previewUrl: null }],
+        lookupSucceeded: false,
+      });
     });
-
-    const res = await GET(makeRequest({ artist: 'Radiohead', track: 'Creep' }));
-    const body = await res.json();
-
-    expect(body.previewUrl).toBeNull();
-  });
-
-  it('returns null when iTunes API fails', async () => {
-    (globalThis.fetch as jest.Mock).mockResolvedValue({
-      ok: false,
-      status: 500,
-    });
-
-    const res = await GET(makeRequest({ artist: 'Radiohead', track: 'Creep' }));
-    const body = await res.json();
-
-    expect(body.previewUrl).toBeNull();
-  });
-
-  it('returns null when fetch throws', async () => {
-    (globalThis.fetch as jest.Mock).mockRejectedValue(new Error('Network error'));
-
-    const res = await GET(makeRequest({ artist: 'Radiohead', track: 'Creep' }));
-    const body = await res.json();
-
-    expect(body.previewUrl).toBeNull();
-  });
-
-  it('encodes search term correctly in iTunes URL', async () => {
-    (globalThis.fetch as jest.Mock).mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({ resultCount: 0, results: [] }),
-    });
-
-    await GET(makeRequest({ artist: 'Björk', track: 'Army of Me' }));
-
-    const fetchCall = (globalThis.fetch as jest.Mock).mock.calls[0];
-    const calledUrl = fetchCall[0] as string;
-    expect(calledUrl).toContain('itunes.apple.com/search');
-    expect(calledUrl).toContain(encodeURIComponent('Björk Army of Me'));
   });
 });
