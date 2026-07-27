@@ -19,8 +19,9 @@ import {
   getTopTracks as getLastFmTopTracks,
 } from '@/lib/lastfm';
 import {
+  enrichTracksWithITunesPreviews,
   getArtistImage,
-  getArtistTopTracks,
+  getArtistTopTracksWithPreviews,
   getArtistSpotifyUrl,
 } from '@/lib/spotify';
 
@@ -54,9 +55,34 @@ interface GraphData {
   links: GraphLink[];
 }
 
+interface PanelLoadResult {
+  data: PanelData;
+  shouldCache: boolean;
+}
+
+const LASTFM_PLACEHOLDER_IMAGE_HASH =
+  '2a96cbd8b46e442fc41c2b86b821562f';
+
 function normalizeArtistName(value: string | null | undefined): string | null {
   const trimmed = value?.trim();
   return trimmed ? trimmed.toLowerCase() : null;
+}
+
+function isUsableArtistImage(
+  value: string | null | undefined
+): value is string {
+  const image = value?.trim();
+  return !!image && !image.toLowerCase().includes(LASTFM_PLACEHOLDER_IMAGE_HASH);
+}
+
+function resolveArtistImage(
+  ...candidates: Array<string | null | undefined>
+): string | undefined {
+  return candidates.find(isUsableArtistImage);
+}
+
+function playablePreviewCount(tracks: PanelData['tracks']): number {
+  return tracks.filter((track) => !!track.preview_url).length;
 }
 
 const MusicGraph = dynamic(() => import('@/components/music-graph'), {
@@ -154,7 +180,10 @@ function mergeGraphs(
   return { nodes: mergedNodes, links: mergedLinks };
 }
 
-async function fetchPanelDataClient(artistName: string): Promise<PanelData> {
+export async function fetchPanelDataClient(
+  artistName: string,
+  graphImage?: string
+): Promise<PanelLoadResult> {
   // Check KV cache first (shared across all users)
   try {
     const res = await fetch(
@@ -163,10 +192,41 @@ async function fetchPanelDataClient(artistName: string): Promise<PanelData> {
     if (res.ok) {
       const { data } = await res.json();
       if (data?.artist && data?.tracks?.length > 0) {
-        const allPreviewsMissing =
-          data.tracks.every((t: { preview_url: string | null }) => !t.preview_url);
-        if (!allPreviewsMissing) {
-          return data as PanelData;
+        const cached = data as PanelData;
+        const cachedArtist = cached.artist;
+        if (!cachedArtist) {
+          throw new Error('Cached panel is missing artist metadata');
+        }
+        const cachedWithImage: PanelData = {
+          ...cached,
+          artist: {
+            ...cachedArtist,
+            image: resolveArtistImage(cachedArtist.image, graphImage),
+          },
+        };
+
+        const before = playablePreviewCount(cachedWithImage.tracks);
+        if (before === cachedWithImage.tracks.length) {
+          return { data: cachedWithImage, shouldCache: false };
+        }
+
+        try {
+          const enriched = await enrichTracksWithITunesPreviews(
+            artistName,
+            cachedWithImage.tracks
+          );
+          const nextData = {
+            ...cachedWithImage,
+            tracks: enriched.tracks,
+          };
+          return {
+            data: nextData,
+            shouldCache:
+              enriched.lookupSucceeded &&
+              playablePreviewCount(enriched.tracks) > before,
+          };
+        } catch {
+          return { data: cachedWithImage, shouldCache: false };
         }
       }
     }
@@ -180,20 +240,32 @@ async function fetchPanelDataClient(artistName: string): Promise<PanelData> {
     getArtistSpotifyUrl(artistName),
   ]);
   const artist = info
-    ? { ...info, image: spotifyImg || info.image, spotifyUrl }
+    ? {
+        ...info,
+        image: resolveArtistImage(spotifyImg, info.image, graphImage),
+        spotifyUrl,
+      }
     : null;
 
   let tracks: PanelData['tracks'] = [];
   let trackSource: TrackSource = null;
+  let previewLookupSucceeded = false;
 
   try {
-    const spotifyTop = await getArtistTopTracks(artistName);
-    if (spotifyTop?.length) {
-      tracks = spotifyTop.slice(0, 10);
+    const spotifyTop = await getArtistTopTracksWithPreviews(artistName);
+    if (spotifyTop.tracks.length) {
+      tracks = spotifyTop.tracks.slice(0, 10);
       trackSource = 'spotify';
-    } else {
+      previewLookupSucceeded = spotifyTop.previewLookupSucceeded;
+    }
+  } catch {
+    /* fall through to Last.fm */
+  }
+
+  if (tracks.length === 0) {
+    try {
       const lastFmTracks = await getLastFmTopTracks(artistName, 10);
-      tracks = lastFmTracks.map((t, idx) => ({
+      const fallbackTracks: PanelData['tracks'] = lastFmTracks.map((t, idx) => ({
         id: `${artistName}-${t.name}-${idx}`,
         name: t.name,
         preview_url: null,
@@ -202,13 +274,26 @@ async function fetchPanelDataClient(artistName: string): Promise<PanelData> {
         album: { name: '—', images: [] },
         artists: [{ name: t.artist }],
       }));
+      const enriched = await enrichTracksWithITunesPreviews(
+        artistName,
+        fallbackTracks
+      );
+      tracks = enriched.tracks;
       trackSource = 'lastfm';
+      previewLookupSucceeded = enriched.lookupSucceeded;
+    } catch {
+      /* leave tracks empty */
     }
-  } catch {
-    /* noop */
   }
 
-  return { artist, tracks, trackSource };
+  const data = { artist, tracks, trackSource };
+  const playable = playablePreviewCount(tracks);
+  return {
+    data,
+    shouldCache:
+      playable > 0 &&
+      (trackSource === 'spotify' || previewLookupSucceeded),
+  };
 }
 
 export default function MusicMapApp({
@@ -368,6 +453,7 @@ export default function MusicMapApp({
     null
   );
   const [tracksLoading, setTracksLoading] = useState(false);
+  const panelRequestTokenRef = useRef(0);
 
   useEffect(() => {
     if (
@@ -376,24 +462,31 @@ export default function MusicMapApp({
       normalizeArtistName(activePanelArtist) === normalizeArtistName(resolvedSeedArtist) &&
       panelData
     ) {
-      const hasSpotifyTracksWithoutPreviews =
-        panelData.trackSource === 'spotify' &&
-        panelData.tracks.length > 0 &&
-        panelData.tracks.every((t) => !t.preview_url);
-
-      if (hasSpotifyTracksWithoutPreviews) {
-        // Use cached artist metadata immediately, but avoid showing stale
-        // unplayable tracks while fresh Spotify/iTunes previews are fetched.
-        setClientPanelData({
-          artist: panelData.artist,
-          tracks: [],
-          trackSource: null,
-        });
-      } else {
-        setClientPanelData(panelData);
-      }
+      const graphImage = initialGraphData?.nodes.find(
+        (node) =>
+          normalizeArtistName(node.name) ===
+          normalizeArtistName(activePanelArtist)
+      )?.image;
+      setClientPanelData({
+        ...panelData,
+        artist: panelData.artist
+          ? {
+              ...panelData.artist,
+              image: resolveArtistImage(
+                panelData.artist.image,
+                graphImage
+              ),
+            }
+          : null,
+      });
     }
-  }, [panelOpen, activePanelArtist, resolvedSeedArtist, panelData]);
+  }, [
+    panelOpen,
+    activePanelArtist,
+    resolvedSeedArtist,
+    panelData,
+    initialGraphData,
+  ]);
 
   const [isExpanding, setIsExpanding] = useState(false);
   const expandTokenRef = useRef(0);
@@ -436,6 +529,8 @@ export default function MusicMapApp({
       setPanelOpen(false);
       setActivePanelArtist(null);
       setClientPanelData(null);
+      setTracksLoading(false);
+      panelRequestTokenRef.current++;
       firstLoadRef.current = true;
       setUrlFocus(null);
       setResetSignal((s) => s + 1);
@@ -487,6 +582,8 @@ export default function MusicMapApp({
     setPanelOpen(false);
     setActivePanelArtist(null);
     setClientPanelData(null);
+    setTracksLoading(false);
+    panelRequestTokenRef.current++;
     firstLoadRef.current = true;
     setCenterNodeName(null);
     setUrlFocus(null);
@@ -506,22 +603,17 @@ export default function MusicMapApp({
         }
         expandFrom(node.name);
       } else {
+        const requestToken = ++panelRequestTokenRef.current;
         setPanelOpen(true);
         setActivePanelArtist(node.name);
         setClientPanelData(null);
         setTracksLoading(true);
-        fetchPanelDataClient(node.name)
-          .then((data) => {
+        fetchPanelDataClient(node.name, node.image)
+          .then(({ data, shouldCache }) => {
+            if (panelRequestTokenRef.current !== requestToken) return;
             setClientPanelData(data);
             setTracksLoading(false);
-            // Save to shared KV cache (fire-and-forget) — skip if all
-            // tracks lack previews (Spotify/iTunes was likely down, or data
-            // fell back to Last.fm; let the next user retry instead of
-            // caching broken data for 180 days).
-            const allPreviewsMissing =
-              data.tracks.length > 0 &&
-              data.tracks.every((t) => !t.preview_url);
-            if (!allPreviewsMissing) {
+            if (shouldCache) {
               fetch('/api/search-cache', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -534,7 +626,7 @@ export default function MusicMapApp({
               setGraph((prev) => {
                 let changed = false;
                 const nodes = prev.nodes.map((n) => {
-                  if (n.id === node.id && !n.image) {
+                  if (n.id === node.id && !isUsableArtistImage(n.image)) {
                     changed = true;
                     return { ...n, image: img };
                   }
@@ -545,6 +637,7 @@ export default function MusicMapApp({
             }
           })
           .catch(() => {
+            if (panelRequestTokenRef.current !== requestToken) return;
             setClientPanelData({ artist: null, tracks: [], trackSource: null });
             setTracksLoading(false);
           });
@@ -561,9 +654,11 @@ export default function MusicMapApp({
   );
 
   const handleClosePanel = useCallback(() => {
+    panelRequestTokenRef.current++;
     setPanelOpen(false);
     setActivePanelArtist(null);
     setClientPanelData(null);
+    setTracksLoading(false);
   }, []);
 
   const overlayMessage = isExpanding

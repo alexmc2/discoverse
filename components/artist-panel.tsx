@@ -377,7 +377,7 @@ export default function ArtistPanel({
                         })}
                       </div>
 
-                      {trackSource === 'spotify' && !hasAnyPlayablePreview && (
+                      {!tracksLoading && !hasAnyPlayablePreview && (
                         <p className="mt-2 text-[11px] text-gray-500">
                           No 30-second previews are currently available for these tracks.
                         </p>
@@ -386,9 +386,9 @@ export default function ArtistPanel({
                       <p className="mt-2 text-[11px] text-gray-500">
                         Source:{' '}
                         {trackSource === 'spotify'
-                          ? 'Spotify Top Tracks (30s previews where available)'
+                          ? 'Spotify Top Tracks (30s previews via Spotify/iTunes where available)'
                           : trackSource === 'lastfm'
-                          ? 'Last.fm Top Tracks (no previews available)'
+                          ? 'Last.fm Top Tracks (30s previews via iTunes where available)'
                           : '—'}
                       </p>
                     </div>
