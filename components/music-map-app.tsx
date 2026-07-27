@@ -63,6 +63,10 @@ interface PanelLoadResult {
 const LASTFM_PLACEHOLDER_IMAGE_HASH =
   '2a96cbd8b46e442fc41c2b86b821562f';
 
+// Cached Apple preview URLs are re-resolved once an entry reaches this age, so
+// a panel can never silently decay into dead play buttons across the cache TTL.
+const PREVIEW_REFRESH_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+
 function normalizeArtistName(value: string | null | undefined): string | null {
   const trimmed = value?.trim();
   return trimmed ? trimmed.toLowerCase() : null;
@@ -190,7 +194,10 @@ export async function fetchPanelDataClient(
       `/api/search-cache?artist=${encodeURIComponent(artistName)}&type=panel`
     );
     if (res.ok) {
-      const { data } = await res.json();
+      const { data, cachedAt } = await res.json();
+      const isStale =
+        typeof cachedAt === 'number' &&
+        Date.now() - cachedAt > PREVIEW_REFRESH_MS;
       if (data?.artist && data?.tracks?.length > 0) {
         const cached = data as PanelData;
         const cachedArtist = cached.artist;
@@ -206,24 +213,31 @@ export async function fetchPanelDataClient(
         };
 
         const before = playablePreviewCount(cachedWithImage.tracks);
-        if (before === cachedWithImage.tracks.length) {
+        if (before === cachedWithImage.tracks.length && !isStale) {
           return { data: cachedWithImage, shouldCache: false };
         }
 
         try {
           const enriched = await enrichTracksWithITunesPreviews(
             artistName,
-            cachedWithImage.tracks
+            cachedWithImage.tracks,
+            undefined,
+            // A complete-but-old entry is re-resolved rather than topped up, so
+            // Apple URLs that have gone stale are replaced before anyone hits a
+            // dead play button.
+            { refreshExisting: isStale }
           );
           const nextData = {
             ...cachedWithImage,
             tracks: enriched.tracks,
           };
+          const after = playablePreviewCount(enriched.tracks);
           return {
             data: nextData,
+            // Rewrite when enrichment improved the entry, or when a stale entry
+            // was successfully re-resolved (which also resets its cachedAt).
             shouldCache:
-              enriched.lookupSucceeded &&
-              playablePreviewCount(enriched.tracks) > before,
+              after > before || (isStale && enriched.lookupSucceeded && after > 0),
           };
         } catch {
           return { data: cachedWithImage, shouldCache: false };
@@ -249,14 +263,12 @@ export async function fetchPanelDataClient(
 
   let tracks: PanelData['tracks'] = [];
   let trackSource: TrackSource = null;
-  let previewLookupSucceeded = false;
 
   try {
     const spotifyTop = await getArtistTopTracksWithPreviews(artistName);
     if (spotifyTop.tracks.length) {
       tracks = spotifyTop.tracks.slice(0, 10);
       trackSource = 'spotify';
-      previewLookupSucceeded = spotifyTop.previewLookupSucceeded;
     }
   } catch {
     /* fall through to Last.fm */
@@ -280,19 +292,20 @@ export async function fetchPanelDataClient(
       );
       tracks = enriched.tracks;
       trackSource = 'lastfm';
-      previewLookupSucceeded = enriched.lookupSucceeded;
     } catch {
       /* leave tracks empty */
     }
   }
 
   const data = { artist, tracks, trackSource };
-  const playable = playablePreviewCount(tracks);
   return {
     data,
-    shouldCache:
-      playable > 0 &&
-      (trackSource === 'spotify' || previewLookupSucceeded),
+    // Persist as soon as a single preview resolved, regardless of whether the
+    // iTunes lookup fully succeeded. Requiring a clean lookup meant one
+    // throttled Apple response left the artist uncached forever, so every
+    // later visitor re-triggered the same failing call and KV could never
+    // recover on its own.
+    shouldCache: playablePreviewCount(tracks) > 0,
   };
 }
 
@@ -653,6 +666,58 @@ export default function MusicMapApp({
     [expandFrom]
   );
 
+  // A preview URL that fails to play is repaired for everyone: re-resolve the
+  // artist against Apple and write the result back to the shared cache. Without
+  // this, one rotted URL stays broken until the entry expires.
+  const repairingRef = useRef<string | null>(null);
+  const handlePreviewFailed = useCallback(
+    async (failed: PanelData['tracks'][number]) => {
+      const artistName = activePanelArtist;
+      if (!artistName || !failed.preview_url) return;
+      if (repairingRef.current === artistName) return;
+      repairingRef.current = artistName;
+
+      const requestToken = panelRequestTokenRef.current;
+      try {
+        const current = clientPanelData;
+        if (!current?.tracks.length) return;
+
+        const enriched = await enrichTracksWithITunesPreviews(
+          artistName,
+          current.tracks,
+          undefined,
+          { refreshExisting: true }
+        );
+        if (!enriched.lookupSucceeded) return;
+
+        const changed = enriched.tracks.some(
+          (track, index) => track.preview_url !== current.tracks[index]?.preview_url
+        );
+        if (!changed) return;
+
+        if (panelRequestTokenRef.current === requestToken) {
+          setClientPanelData({ ...current, tracks: enriched.tracks });
+        }
+        if (playablePreviewCount(enriched.tracks) > 0) {
+          fetch('/api/search-cache', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              artist: artistName,
+              type: 'panel',
+              data: { ...current, tracks: enriched.tracks },
+            }),
+          }).catch(() => {});
+        }
+      } catch {
+        /* leave the panel as-is */
+      } finally {
+        repairingRef.current = null;
+      }
+    },
+    [activePanelArtist, clientPanelData]
+  );
+
   const handleClosePanel = useCallback(() => {
     panelRequestTokenRef.current++;
     setPanelOpen(false);
@@ -755,6 +820,7 @@ export default function MusicMapApp({
           tracksLoading={tracksLoading}
           onClose={handleClosePanel}
           onExpand={handleExpandFromPanel}
+          onPreviewFailed={handlePreviewFailed}
         />
       )}
 

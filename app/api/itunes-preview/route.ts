@@ -1,15 +1,51 @@
 // app/api/itunes-preview/route.ts
 // Server-side proxy for iTunes Search API to avoid CORS errors in browsers.
 import {
+  fetchITunesCatalog,
   lookupITunesTracks,
+  matchITunesTracks,
   normalizeITunesCountry,
+  type ITunesCatalogResult,
   type ITunesTrackRequest,
 } from '@/lib/itunes';
+import { getCached, setCached } from '@/lib/server/cache';
 
 const MAX_TRACKS = 10;
+const CATALOG_TTL_SECONDS = 7 * 24 * 60 * 60; // 7 days
 
 function upstreamFailureStatus(status?: number): number {
   return status === 429 ? 429 : 502;
+}
+
+type CachedCatalog = Pick<ITunesCatalogResult, 'results'>;
+
+/**
+ * Apple rate-limits the Cloudflare Worker's shared egress IP aggressively, so
+ * this proxy caches each artist's catalogue rather than re-querying per request.
+ * Clients call Apple directly (it sends CORS headers) and only fall back here,
+ * so this path should stay cold.
+ */
+async function getCatalog(
+  artist: string,
+  country: string
+): Promise<ITunesCatalogResult> {
+  const key = `itunes:catalog:v1:${country}:${encodeURIComponent(
+    artist.trim().toLowerCase()
+  )}`;
+
+  const cached = await getCached<CachedCatalog>(key);
+  if (cached?.results?.length) {
+    return { results: cached.results, lookupSucceeded: true };
+  }
+
+  const fresh = await fetchITunesCatalog(artist, country);
+  if (fresh.lookupSucceeded && fresh.results.length) {
+    // Best-effort; a failed write must not fail the request.
+    setCached<CachedCatalog>(key, { results: fresh.results }, CATALOG_TTL_SECONDS).catch(
+      () => {}
+    );
+  }
+  return fresh;
 }
 
 export async function GET(request: Request) {
@@ -94,16 +130,19 @@ export async function POST(request: Request) {
     );
   }
 
-  const result = await lookupITunesTracks(artist, tracks, country);
-  if (!result.lookupSucceeded) {
+  const catalog = await getCatalog(artist, normalizeITunesCountry(country));
+  if (!catalog.lookupSucceeded) {
     return Response.json(
-      { matches: result.matches, lookupSucceeded: false },
-      { status: upstreamFailureStatus(result.upstreamStatus) }
+      {
+        matches: tracks.map(() => ({ previewUrl: null })),
+        lookupSucceeded: false,
+      },
+      { status: upstreamFailureStatus(catalog.upstreamStatus) }
     );
   }
 
   return Response.json({
-    matches: result.matches,
+    matches: matchITunesTracks(artist, tracks, catalog.results),
     lookupSucceeded: true,
   });
 }

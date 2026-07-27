@@ -94,12 +94,20 @@ export function matchITunesTracks(
   tracks: ITunesTrackRequest[],
   results: ITunesSearchResult[]
 ): ITunesTrackMatch[] {
+  const claimed = new Set<ITunesSearchResult>();
+
   return tracks.map((track) => {
     const requestedArtist = track.artist?.trim() || artistName;
     const exactTitle = normalizeTrack(track.name, false);
     const canonicalTitle = normalizeTrack(track.name, true);
 
     let best:
+      | {
+          result: ITunesSearchResult;
+          score: number;
+        }
+      | undefined;
+    let bestUnclaimed:
       | {
           result: ITunesSearchResult;
           score: number;
@@ -128,12 +136,25 @@ export function matchITunesTracks(
       if (!best || score > best.score) {
         best = { result, score };
       }
+      if (
+        !claimed.has(result) &&
+        (!bestUnclaimed || score > bestUnclaimed.score)
+      ) {
+        bestUnclaimed = { result, score };
+      }
     }
 
+    // Prefer a result no earlier track has already taken, so a title and its
+    // remaster/edit don't both collapse onto the same Apple recording. Fall
+    // back to the claimed one when there is no alternative, which keeps
+    // genuinely repeated titles working.
+    const chosen = bestUnclaimed ?? best;
+    if (chosen) claimed.add(chosen.result);
+
     return {
-      previewUrl: best?.result.previewUrl ?? null,
-      albumName: best?.result.collectionName,
-      durationMs: best?.result.trackTimeMillis,
+      previewUrl: chosen?.result.previewUrl ?? null,
+      albumName: chosen?.result.collectionName,
+      durationMs: chosen?.result.trackTimeMillis,
     };
   });
 }
@@ -143,17 +164,23 @@ export function normalizeITunesCountry(country?: string): string {
   return normalized && /^[A-Z]{2}$/.test(normalized) ? normalized : 'GB';
 }
 
-export async function lookupITunesTracks(
+export interface ITunesCatalogResult {
+  results: ITunesSearchResult[];
+  lookupSucceeded: boolean;
+  upstreamStatus?: number;
+}
+
+/**
+ * Fetch an artist's Apple catalogue. Split out from `lookupITunesTracks` so the
+ * Worker-side proxy can cache the catalogue per artist in KV — Apple rate-limits
+ * the shared Cloudflare egress IP hard, so it must be hit once per artist rather
+ * than once per page view.
+ */
+export async function fetchITunesCatalog(
   artistName: string,
-  tracks: ITunesTrackRequest[],
   country?: string,
   options: ITunesLookupOptions = {}
-): Promise<ITunesLookupResult> {
-  const emptyMatches = tracks.map(() => ({ previewUrl: null }));
-  if (!artistName.trim() || tracks.length === 0) {
-    return { matches: emptyMatches, lookupSucceeded: true };
-  }
-
+): Promise<ITunesCatalogResult> {
   const limit = Math.min(
     200,
     Math.max(1, Math.round(options.limit ?? 200))
@@ -176,7 +203,7 @@ export async function lookupITunesTracks(
     });
     if (!response.ok) {
       return {
-        matches: emptyMatches,
+        results: [],
         lookupSucceeded: false,
         upstreamStatus: response.status,
       };
@@ -184,13 +211,40 @@ export async function lookupITunesTracks(
 
     const data = (await response.json()) as ITunesSearchResponse;
     return {
-      matches: matchITunesTracks(
-        artistName,
-        tracks,
-        Array.isArray(data.results) ? data.results : []
-      ),
+      results: Array.isArray(data.results) ? data.results : [],
       lookupSucceeded: true,
       upstreamStatus: response.status,
+    };
+  } catch {
+    return { results: [], lookupSucceeded: false };
+  }
+}
+
+export async function lookupITunesTracks(
+  artistName: string,
+  tracks: ITunesTrackRequest[],
+  country?: string,
+  options: ITunesLookupOptions = {}
+): Promise<ITunesLookupResult> {
+  const emptyMatches = tracks.map(() => ({ previewUrl: null }));
+  if (!artistName.trim() || tracks.length === 0) {
+    return { matches: emptyMatches, lookupSucceeded: true };
+  }
+
+  try {
+    const catalog = await fetchITunesCatalog(artistName, country, options);
+    if (!catalog.lookupSucceeded) {
+      return {
+        matches: emptyMatches,
+        lookupSucceeded: false,
+        upstreamStatus: catalog.upstreamStatus,
+      };
+    }
+
+    return {
+      matches: matchITunesTracks(artistName, tracks, catalog.results),
+      lookupSucceeded: true,
+      upstreamStatus: catalog.upstreamStatus,
     };
   } catch {
     return {

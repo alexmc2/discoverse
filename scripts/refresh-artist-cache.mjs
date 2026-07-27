@@ -29,6 +29,8 @@ function parseArgs(argv) {
     artists: [],
     dryRun: false,
     skipExisting: false,
+    panelOnly: false,
+    missingTracks: false,
     help: false,
   };
 
@@ -61,6 +63,16 @@ function parseArgs(argv) {
       continue;
     }
 
+    if (token === '--panel-only') {
+      args.panelOnly = true;
+      continue;
+    }
+
+    if (token === '--missing-tracks') {
+      args.missingTracks = true;
+      continue;
+    }
+
     if (token === '--help' || token === '-h') {
       args.help = true;
       continue;
@@ -82,6 +94,15 @@ function printHelp() {
       '  npm run refresh:artist-cache -- --artist \"Depeche Mode\"',
       '  npm run refresh:artist-cache -- --artist=\"Radiohead\" --dry-run',
       '  npm run refresh:artist-cache -- --skip-existing',
+      '  npm run refresh:artist-cache -- --missing-tracks --panel-only',
+      '',
+      'Options:',
+      '  --artist <name>    Refresh only the named artist (repeatable).',
+      '  --skip-existing    Skip artists that already have graph data.',
+      '  --missing-tracks   Only refresh entries that have no track list yet.',
+      '  --panel-only       Reuse the stored graph and refresh just the panel.',
+      '                     Avoids ~48 Spotify image lookups per artist.',
+      '  --dry-run          Do not write the file.',
       '',
       'Env required:',
       '  NEXT_PUBLIC_LASTFM_API_KEY',
@@ -165,12 +186,18 @@ async function fetchPanelData(artistName) {
   return { artist, tracks, trackSource };
 }
 
-async function refreshEntry(artistName, nowIso) {
-  const graphData = await withRetry(
-    `graph:${artistName}`,
-    async () => await buildGraphData(artistName, 2),
-    1
-  );
+async function refreshEntry(artistName, nowIso, options = {}) {
+  // Rebuilding a graph costs one Spotify image lookup per node (~48 each), so
+  // --panel-only reuses the stored graph when only the track list is missing.
+  // Across the full pool that is the difference between ~5,000 unique Spotify
+  // lookups and a few hundred.
+  const graphData = options.existingGraphData
+    ? options.existingGraphData
+    : await withRetry(
+        `graph:${artistName}`,
+        async () => await buildGraphData(artistName, 2),
+        1
+      );
   const panelData = await withRetry(
     `panel:${artistName}`,
     async () => await fetchPanelData(artistName),
@@ -224,11 +251,25 @@ async function main() {
   const failedArtists = [];
   const nowIso = new Date().toISOString();
 
-  const toFetch = args.skipExisting
+  let toFetch = args.skipExisting
     ? artists.filter((a) => !existing[normalizeArtistName(a)]?.graphData)
     : artists;
 
-  if (args.skipExisting) {
+  if (args.missingTracks) {
+    // Only entries that have no track list yet — the ones actually broken.
+    toFetch = toFetch.filter(
+      (a) => !existing[normalizeArtistName(a)]?.panelData?.tracks?.length
+    );
+    for (const a of artists) {
+      const key = normalizeArtistName(a);
+      if (existing[key]) next[key] = existing[key];
+    }
+    console.log(
+      `${artists.length} total artists, ${toFetch.length} missing track data${
+        args.panelOnly ? ' (reusing stored graphs)' : ''
+      }...`
+    );
+  } else if (args.skipExisting) {
     console.log(
       `${artists.length} total artists, ${artists.length - toFetch.length} already cached, ${toFetch.length} to fetch...`
     );
@@ -254,7 +295,11 @@ async function main() {
     );
 
     try {
-      next[cacheKey] = await refreshEntry(displayName, nowIso);
+      next[cacheKey] = await refreshEntry(displayName, nowIso, {
+        existingGraphData: args.panelOnly
+          ? existing[cacheKey]?.graphData
+          : undefined,
+      });
       refreshedCount++;
       console.log('ok');
     } catch (error) {

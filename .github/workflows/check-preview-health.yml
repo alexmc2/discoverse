@@ -1,0 +1,25 @@
+name: Check Preview Health
+
+# Every previous top-tracks outage went unnoticed for months because the unit
+# suite mocks fetch and stays green while production degrades. This hits the
+# real deployed cache and the real Apple CDN, so a regression surfaces in days.
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '23 7 * * 2'
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+
+      - name: Verify cached previews still play
+        run: node scripts/check-preview-health.mjs --sample 12 --threshold 0.9

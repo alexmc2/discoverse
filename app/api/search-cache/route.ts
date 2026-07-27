@@ -2,7 +2,11 @@
 import { getKV } from '@/lib/server/cache';
 import { getDefaultArtistPanelData } from '@/lib/server/artists';
 
-const HARD_TTL_SECONDS = 180 * 24 * 60 * 60; // 180 days
+// Apple preview URLs are stable but not permanent, and a stale entry that
+// nothing revalidates silently degrades into ten dead play buttons. Entries are
+// refreshed in-place by the client well before this, so the TTL is only a
+// backstop for artists nobody visits.
+const HARD_TTL_SECONDS = 60 * 24 * 60 * 60; // 60 days
 
 export async function GET(request: Request) {
   const kv = getKV();
@@ -24,7 +28,13 @@ export async function GET(request: Request) {
     const raw = await kv.get(searchKey);
     if (raw) {
       const envelope = JSON.parse(raw);
-      return Response.json({ data: envelope?.data ?? envelope });
+      // Surface the write timestamp so the client can refresh preview URLs that
+      // have had time to rot, instead of trusting them for the whole TTL.
+      return Response.json({
+        data: envelope?.data ?? envelope,
+        cachedAt:
+          typeof envelope?.cachedAt === 'number' ? envelope.cachedAt : null,
+      });
     }
 
     // For panel data, also check the default artist cache

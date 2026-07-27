@@ -1,9 +1,22 @@
 name: Refresh Artist Cache
 
+# Manual only. This job needs SPOTIFY_CLIENT_ID/SECRET, and those credentials come
+# from a legacy Spotify account that cannot be re-obtained — they are deliberately
+# not stored in GitHub Actions secrets. Refresh the cache locally instead, where
+# .env.local already has them:
+#
+#   npm run refresh:artist-cache -- --skip-existing
+#   npm run kv:upload-artist-cache
+#
+# Running locally also avoids Apple throttling GitHub's shared runner IPs, which
+# is the same failure that breaks the Cloudflare Worker's iTunes lookups.
+#
+# The scheduled run was removed on 2026-07-27: it had failed every week since
+# March because the secrets were never set, and GitHub then disabled it for
+# inactivity. Preview health is covered by check-preview-health.yml, which needs
+# no secrets at all.
 on:
   workflow_dispatch:
-  schedule:
-    - cron: '17 6 * * 1'
 
 permissions:
   contents: write
@@ -17,13 +30,38 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: '22'
           cache: 'npm'
+
+      # Fail with an actionable message rather than a stack trace 25 lines into
+      # the refresh script. Every run from March to May 2026 died here because
+      # the repository secrets were never configured.
+      - name: Verify required secrets are configured
+        env:
+          NEXT_PUBLIC_LASTFM_API_KEY: ${{ secrets.NEXT_PUBLIC_LASTFM_API_KEY }}
+          SPOTIFY_CLIENT_ID: ${{ secrets.SPOTIFY_CLIENT_ID }}
+          SPOTIFY_CLIENT_SECRET: ${{ secrets.SPOTIFY_CLIENT_SECRET }}
+        run: |
+          missing=""
+          for name in NEXT_PUBLIC_LASTFM_API_KEY SPOTIFY_CLIENT_ID SPOTIFY_CLIENT_SECRET; do
+            if [ -z "${!name}" ]; then
+              missing="$missing $name"
+            fi
+          done
+          if [ -n "$missing" ]; then
+            echo "::error::Missing repository secrets:$missing"
+            echo "Set them under Settings > Secrets and variables > Actions, or run:"
+            for name in $missing; do
+              echo "  gh secret set $name"
+            done
+            exit 1
+          fi
+          echo "All required secrets are present."
 
       - name: Install dependencies
         run: npm ci

@@ -73,7 +73,7 @@ describe('POST /api/search-cache', () => {
     expect(stored.data).toEqual(graphData);
     expect(stored.v).toBe(1);
     expect(typeof stored.cachedAt).toBe('number');
-    expect(opts.expirationTtl).toBe(180 * 24 * 60 * 60);
+    expect(opts.expirationTtl).toBe(60 * 24 * 60 * 60);
   });
 
   it('stores panel data in KV with correct key', async () => {

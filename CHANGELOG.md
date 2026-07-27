@@ -2,6 +2,47 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2026-07-27] -  Top tracks repair
+
+Repairs PR #17, which made an already-degraded preview pipeline fail permanently. Two underlying
+platform facts were confirmed against the live APIs and drove the fix:
+
+- Spotify `preview_url` is now `null` on every endpoint (`/artists/{id}/top-tracks`, `/search?type=track`,
+  `/tracks/{id}`) in every market. The top-tracks endpoint itself still returns HTTP 200 with 10 tracks
+  and is *not* deprecated, contrary to the assumption recorded in the 2026-03-02 entry. iTunes is the
+  only remaining preview source.
+- Apple rate-limits the Cloudflare Worker's shared egress IP. 12 of 12 sequential POSTs to the deployed
+  `/api/itunes-preview` returned 429/502, while the same queries succeed from a residential IP.
+
+### Fixed
+- Moved the iTunes lookup out of the Worker proxy and into the browser. iTunes Search sends CORS headers
+  (verified: `access-control-allow-origin` echoed, `OPTIONS` preflight 200), so each lookup now runs on
+  the end user's own IP instead of funnelling the whole site through the Worker's few egress IPs.
+  `/api/itunes-preview` is retained as a fallback for clients where the direct call is blocked. No CSP
+  change was needed - `connect-src` already allowed `itunes.apple.com` and `media-src` already allowed
+  `audio-ssl.itunes.apple.com`.
+- Fixed the cache-write death spiral. PR #17 tightened the gate to require a fully successful iTunes
+  lookup, so one throttled Apple response meant the artist was never written to KV, and every later
+  visitor re-triggered the same failing call. Panels are now persisted as soon as a single preview
+  resolves, restoring the pre-PR#17 semantics.
+- Added bounded retry with backoff to `spotifyGET`, honouring `Retry-After` on 429 and 5xx. It previously
+  returned `null` on any non-ok response with no retry, so a single transient 502 (observed roughly 1 in
+  30) silently dropped the whole panel to the Last.fm fallback.
+- Restored the multi-market loop in `getArtistTopTracksWithPreviews`. PR #17 reduced it to a single
+  market, so an artist absent from the viewer's storefront lost their tracks entirely. The old
+  second loop that re-queried markets hunting for `preview_url` was deliberately not restored, since
+  Spotify now returns null everywhere.
+- Stopped two distinct tracks resolving to the same Apple recording (observed on Duran Duran, where two
+  rows shared one "Ordinary World" preview). Matching now prefers a result no earlier track has claimed.
+- Cached the Worker proxy's Apple catalogue lookups in KV for 7 days via the existing `getCached`/
+  `setCached` helpers, so the fallback path hits Apple at most once per artist rather than once per request.
+
+### Added
+- Regression tests for the two bugs above, both verified to fail against the pre-fix logic: a panel with
+  a partial-but-nonzero preview count must still be cached, and two distinct titles must not share a
+  preview URL. Note that the existing suite mocks `fetch`, which is exactly the layer that fails in
+  production, so it could not have caught either bug.
+
 ## [2026-03-15] -  Cache hardening and test suite
 
 ### Added

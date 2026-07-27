@@ -285,7 +285,7 @@ describe('spotify module', () => {
       expect(result).toEqual([]);
     });
 
-    it('uses one batch preview lookup when Spotify tracks lack previews', async () => {
+    it('resolves missing previews with a single direct iTunes lookup', async () => {
       const mockArtist = {
         id: 'abc123',
         name: 'Radiohead',
@@ -337,15 +337,19 @@ describe('spotify module', () => {
           ok: true,
           json: () =>
             Promise.resolve({
-              lookupSucceeded: true,
-              matches: [
+              resultCount: 2,
+              results: [
                 {
+                  artistName: 'Radiohead',
+                  trackName: 'Creep',
                   previewUrl: 'https://audio.example/creep.m4a',
                 },
                 {
+                  artistName: 'Radiohead',
+                  trackName: 'Karma Police',
                   previewUrl: 'https://audio.example/karma.m4a',
-                  albumName: 'OK Computer',
-                  durationMs: 264000,
+                  collectionName: 'OK Computer',
+                  trackTimeMillis: 264000,
                 },
               ],
             }),
@@ -374,19 +378,18 @@ describe('spotify module', () => {
           String(url).includes('/top-tracks?market=')
         )
       ).toHaveLength(1);
-      expect(calls[3][0]).toBe('/api/itunes-preview');
-      expect(calls[3][1]).toMatchObject({
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-      });
-      expect(JSON.parse(calls[3][1].body)).toMatchObject({
-        artist: 'Radiohead',
-        country: 'GB',
-        tracks: [
-          { name: 'Creep', artist: 'Radiohead' },
-          { name: 'Karma Police', artist: 'Radiohead' },
-        ],
-      });
+      // The browser must call Apple directly rather than proxying through the
+      // Worker, whose shared egress IP Apple rate-limits.
+      const itunesUrl = new URL(String(calls[3][0]));
+      expect(itunesUrl.origin + itunesUrl.pathname).toBe(
+        'https://itunes.apple.com/search'
+      );
+      expect(itunesUrl.searchParams.get('term')).toBe('Radiohead');
+      expect(itunesUrl.searchParams.get('country')).toBe('GB');
+      expect(itunesUrl.searchParams.get('attribute')).toBe('artistTerm');
+      expect(
+        calls.filter(([url]) => String(url) === '/api/itunes-preview')
+      ).toHaveLength(0);
     });
 
     it('preserves Spotify data when the batch preview lookup fails', async () => {
@@ -427,7 +430,15 @@ describe('spotify module', () => {
       expect(result.lookupSucceeded).toBe(false);
       expect(result.tracks).toEqual(originalTracks);
       expect(result.tracks).not.toBe(originalTracks);
-      expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+
+      // Direct Apple call first, then the Worker proxy as a fallback for
+      // clients where the direct request is blocked.
+      const urls = (globalThis.fetch as jest.Mock).mock.calls.map(([url]) =>
+        String(url)
+      );
+      expect(urls).toHaveLength(2);
+      expect(urls[0]).toContain('https://itunes.apple.com/search');
+      expect(urls[1]).toBe('/api/itunes-preview');
     });
 
     it('returns no Spotify tracks when the top-tracks endpoint is unavailable', async () => {
@@ -454,7 +465,8 @@ describe('spotify module', () => {
           json: () =>
             Promise.resolve({ artists: { items: [mockArtist] } }),
         })
-        .mockResolvedValueOnce({
+        // 403 is not retryable, but every market is still attempted.
+        .mockResolvedValue({
           ok: false,
           status: 403,
         });
@@ -468,7 +480,17 @@ describe('spotify module', () => {
         tracks: [],
         previewLookupSucceeded: false,
       });
-      expect(globalThis.fetch).toHaveBeenCalledTimes(3);
+
+      // An artist absent from one storefront must not sink the whole panel, so
+      // each market is tried before giving up.
+      const topTrackCalls = (globalThis.fetch as jest.Mock).mock.calls.filter(
+        ([url]) => String(url).includes('/top-tracks?market=')
+      );
+      expect(topTrackCalls.length).toBeGreaterThan(1);
+      const markets = topTrackCalls.map(([url]) =>
+        new URL(String(url)).searchParams.get('market')
+      );
+      expect(new Set(markets).size).toBe(topTrackCalls.length);
     });
   });
 });
